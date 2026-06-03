@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Film clapperboard icon for Movies App -->
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M30,35 L78,35 L78,73 L30,73 Z" />
+    <path
+        android:fillColor="#1B1B2F"
+        android:pathData="M30,35 L78,35 L78,45 L30,45 Z" />
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M38,35 L42,35 L42,45 L38,45 Z
+                          M52,35 L56,35 L56,45 L52,45 Z
+                          M66,35 L70,35 L70,45 L66,45 Z" />
+</vector>
