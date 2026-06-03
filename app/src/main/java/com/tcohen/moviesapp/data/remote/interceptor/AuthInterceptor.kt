@@ -12,8 +12,13 @@ class AuthInterceptor @Inject constructor(private val apiKey: String) : Intercep
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         val url = originalRequest.url.newBuilder()
-            .addQueryParameter("api_key", apiKey)
+            .addQueryParameter(QUERY_PARAM_API_KEY, apiKey)
             .build()
         return chain.proceed(originalRequest.newBuilder().url(url).build())
+    }
+
+    companion object {
+        /** TMDB query parameter name that carries the API key on every request. */
+        const val QUERY_PARAM_API_KEY = "api_key"
     }
 }

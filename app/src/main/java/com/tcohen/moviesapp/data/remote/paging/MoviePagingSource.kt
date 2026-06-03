@@ -19,7 +19,7 @@ class MoviePagingSource(
 ) : PagingSource<Int, Movie>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Movie> {
-        val page = params.key ?: 1
+        val page = params.key ?: STARTING_PAGE_INDEX
 
         return if (networkMonitor.isCurrentlyOnline()) {
             loadFromNetwork(page)
@@ -43,7 +43,7 @@ class MoviePagingSource(
 
             LoadResult.Page(
                 data = movies,
-                prevKey = if (page == 1) null else page - 1,
+                prevKey = if (page == STARTING_PAGE_INDEX) null else page - 1,
                 nextKey = if (page >= response.totalPages) null else page + 1
             )
         } catch (e: Exception) {
@@ -57,10 +57,10 @@ class MoviePagingSource(
             .map { it.toDomain() }
 
         return if (cached.isNotEmpty()) {
-            val lastCachedPage = movieDao.getLastCachedPage(category.name) ?: 1
+            val lastCachedPage = movieDao.getLastCachedPage(category.name) ?: STARTING_PAGE_INDEX
             LoadResult.Page(
                 data = cached,
-                prevKey = if (page == 1) null else page - 1,
+                prevKey = if (page == STARTING_PAGE_INDEX) null else page - 1,
                 nextKey = if (page >= lastCachedPage) null else page + 1
             )
         } else {
@@ -74,5 +74,13 @@ class MoviePagingSource(
             state.closestPageToPosition(anchor)?.prevKey?.plus(1)
                 ?: state.closestPageToPosition(anchor)?.nextKey?.minus(1)
         }
+    }
+
+    companion object {
+        /**
+         * Index of the first page when starting a fresh paging session.
+         * TMDB uses 1-based page numbers.
+         */
+        const val STARTING_PAGE_INDEX = 1
     }
 }

@@ -175,6 +175,35 @@ This document explains the major technical choices made for the Movies App and t
 
 ---
 
+## No Magic Numbers or Magic Strings
+
+**Decision:** Every non-obvious literal — numeric or string — must be a named `const val` co-located in the file or class that owns it.
+
+**Why:**
+- A bare `20` next to `pageSize =` is meaningless; `PAGE_SIZE = 20` is self-documenting and refactor-safe.
+- A bare `"YouTube"` scattered across files creates silent coupling — a typo or API change breaks only the instances you find by accident.
+- Co-location (not a central `Constants.kt`) means constants live next to the logic they control, keeping context local. Reviewers can understand a constant without jumping to another file.
+
+**Rules enforced in this project:**
+- Constants are `const val` inside the **companion object** of the class that uses them (or directly inside a Kotlin `object` since objects have no companion).
+- Constants are `private` unless other classes need to reference them (e.g. test assertions, shared defaults).
+- Every constant has a KDoc comment explaining its meaning — not just its value.
+
+**Where each area's constants live:**
+
+| Constant(s) | Owner |
+|---|---|
+| `QUERY_PARAM_API_KEY` | `AuthInterceptor.Companion` |
+| `HEADER_CACHE_CONTROL`, `CACHE_CONTROL_ONE_DAY`, `CONTENT_TYPE_JSON`, `IMAGE_CACHE_MAX_SIZE_BYTES` | `NetworkModule` (top-level `object`) |
+| `DEFAULT_LANGUAGE`, `DEFAULT_PAGE` | `TmdbApiService.Companion` |
+| `STARTING_PAGE_INDEX` | `MoviePagingSource.Companion` |
+| `PAGE_SIZE`, `PREFETCH_DISTANCE`, `VIDEO_SITE_YOUTUBE`, `VIDEO_TYPE_TRAILER` | `MovieRepositoryImpl.Companion` |
+| `DEFAULT_MESSAGE` | `NetworkUnavailableException.Companion` |
+| `ROUTE`, `LABEL`, `ARG_MOVIE_ID` | `Screen.Home` / `Screen.Favorites` / `Screen.MovieDetail` |
+| `DATABASE_NAME` | `AppDatabase.Companion` |
+
+---
+
 ## Single-Module vs Multi-Module
 
 **Decision:** Start with a single Gradle module (`:app`), with package-level separation.

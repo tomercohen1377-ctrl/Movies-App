@@ -19,6 +19,35 @@ Target platform: **Android** (Jetpack Compose + Clean Architecture + MVI)
 
 ---
 
+## Coding Conventions (apply to every phase)
+
+> These rules apply to **every file written in every phase**. No exceptions.
+
+### No Magic Numbers or Magic Strings
+- Every non-obvious literal must be a named `const val`.
+- Constants live in the **companion object** of the class that owns them, or directly inside a Kotlin `object` (which has no companion).
+- Do **not** create a central `Constants.kt` — constants belong next to the logic they control.
+- Every constant must have a KDoc comment explaining its meaning.
+- Mark constants `private` unless another class legitimately needs them.
+
+```kotlin
+// ✅ Correct — co-located, named, documented
+companion object {
+    /** Number of items loaded per page from the TMDB API. */
+    private const val PAGE_SIZE = 20
+}
+
+// ❌ Wrong — raw literal inline
+pageSize = 20
+```
+
+### Other Conventions
+- All functions and public properties have KDoc.
+- No single function longer than ~30 lines — extract if needed.
+- No raw `TODO()` left in committed code — use `// TODO(phase-N): description` format.
+
+---
+
 ## Phase 1 — Project Setup (~1 hour)
 
 ### Step 1.1 — Create Android Project

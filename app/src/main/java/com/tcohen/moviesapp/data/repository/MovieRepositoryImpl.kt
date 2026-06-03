@@ -9,6 +9,7 @@ import com.tcohen.moviesapp.data.local.entity.FavoriteEntity
 import com.tcohen.moviesapp.data.mapper.toDomain
 import com.tcohen.moviesapp.data.mapper.toEntity
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
+import com.tcohen.moviesapp.data.remote.dto.VideoDto
 import com.tcohen.moviesapp.data.remote.paging.MoviePagingSource
 import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Movie
@@ -30,9 +31,9 @@ class MovieRepositoryImpl @Inject constructor(
     override fun getMovies(category: Category): Flow<PagingData<Movie>> {
         return Pager(
             config = PagingConfig(
-                pageSize = 20,
+                pageSize = PAGE_SIZE,
                 enablePlaceholders = false,
-                prefetchDistance = 5
+                prefetchDistance = PREFETCH_DISTANCE
             ),
             pagingSourceFactory = {
                 MoviePagingSource(
@@ -52,9 +53,11 @@ class MovieRepositoryImpl @Inject constructor(
     override suspend fun getTrailer(movieId: Int): VideoResult? {
         if (!networkMonitor.isCurrentlyOnline()) return null
         return apiService.getMovieVideos(movieId).results
-            .filter { it.site == "YouTube" && it.type == "Trailer" }
-            .sortedWith(compareByDescending<com.tcohen.moviesapp.data.remote.dto.VideoDto> { it.official }
-                .thenByDescending { it.publishedAt })
+            .filter { it.site == VIDEO_SITE_YOUTUBE && it.type == VIDEO_TYPE_TRAILER }
+            .sortedWith(
+                compareByDescending<VideoDto> { it.official }
+                    .thenByDescending { it.publishedAt }
+            )
             .firstOrNull()
             ?.toDomain()
     }
@@ -87,4 +90,18 @@ class MovieRepositoryImpl @Inject constructor(
         voteAverage = voteAverage,
         voteCount = voteCount
     )
+
+    companion object {
+        /** Number of items loaded per page from the TMDB API. */
+        private const val PAGE_SIZE = 20
+
+        /** Items remaining before the end of the list that trigger a new page load. */
+        private const val PREFETCH_DISTANCE = 5
+
+        /** Video hosting site identifier used to filter YouTube trailers. */
+        private const val VIDEO_SITE_YOUTUBE = "YouTube"
+
+        /** Video type used to identify trailers in the TMDB videos response. */
+        private const val VIDEO_TYPE_TRAILER = "Trailer"
+    }
 }
