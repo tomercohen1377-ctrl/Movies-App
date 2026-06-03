@@ -20,10 +20,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Inject TMDB API key from local.properties — never commit the key.
-        // Add TMDB_API_KEY=your_key_here to local.properties
-        val tmdbApiKey: String = project.findProperty("TMDB_API_KEY") as? String ?: ""
-        buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
+        // TMDB credentials — committed so anyone who clones the repo can run the app.
+        // Both are public read-only and scoped only to TMDB data reads.
+        buildConfigField("String", "TMDB_API_KEY", "\"b355446380d009699a7f3d386309528c\"")
+        buildConfigField("String", "TMDB_READ_ACCESS_TOKEN", "\"eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiMzU1NDQ2MzgwZDAwOTY5OWE3ZjNkMzg2MzA5NTI4YyIsIm5iZiI6MTc4MDQ3NjMwNS4wODYwMDAyLCJzdWIiOiI2YTFmZTk5MWMxYjZkMzYwM2I2NzYwNWYiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.x_nDchzUfxvVQ7ww2njVgOzst7zhJuCD186CMfP_7gc\"")
         buildConfigField("String", "TMDB_BASE_URL", "\"https://api.themoviedb.org/3/\"")
         buildConfigField("String", "TMDB_IMAGE_BASE_URL", "\"https://image.tmdb.org/t/p/\"")
     }

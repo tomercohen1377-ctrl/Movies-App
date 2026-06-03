@@ -74,6 +74,18 @@ fun FavoriteEntity.toDomain(): Movie = Movie(
 
 // Domain → Entity
 
+/** Converts a [MovieDetail] back to a lightweight [Movie] for favorites operations. */
+fun MovieDetail.toMovie(): Movie = Movie(
+    id = id,
+    title = title,
+    overview = overview,
+    posterPath = posterPath,
+    backdropPath = backdropPath,
+    releaseDate = releaseDate,
+    voteAverage = voteAverage,
+    voteCount = voteCount
+)
+
 fun Movie.toEntity(category: Category, page: Int): MovieEntity = MovieEntity(
     id = id,
     title = title,

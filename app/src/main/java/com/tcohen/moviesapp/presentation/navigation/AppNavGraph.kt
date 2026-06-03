@@ -1,32 +1,30 @@
 package com.tcohen.moviesapp.presentation.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.tcohen.moviesapp.presentation.favorites.FavoritesScreen
+import com.tcohen.moviesapp.presentation.home.HomeScreen
+import com.tcohen.moviesapp.presentation.moviedetail.MovieDetailScreen
 
 /**
  * Root navigation graph.
  *
- * Screens are stubbed with placeholder composables for Phase 1.
- * Full implementations will be added in Phase 4.
+ * Structure:
+ * - [Screen.Home] and [Screen.Favorites] are the two bottom-nav tabs.
+ * - [Screen.MovieDetail] is reachable from both tabs and sits outside the bottom nav.
  */
 @Composable
 fun AppNavGraph(
     navController: NavHostController = rememberNavController()
 ) {
     Scaffold(
-        bottomBar = {
-            BottomNavBar(navController = navController)
-        }
+        bottomBar = { BottomNavBar(navController = navController) }
     ) { innerPadding ->
         NavHost(
             navController = navController,
@@ -34,27 +32,29 @@ fun AppNavGraph(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Home.route) {
-                PlaceholderScreen(label = "Home — coming in Phase 4")
+                HomeScreen(
+                    onNavigateToDetail = { movieId ->
+                        navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                    }
+                )
             }
+
             composable(Screen.Favorites.route) {
-                PlaceholderScreen(label = "Favorites — coming in Phase 4")
+                FavoritesScreen(
+                    onNavigateToDetail = { movieId ->
+                        navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                    }
+                )
             }
+
             composable(
                 route = Screen.MovieDetail.routeWithArgs,
                 arguments = Screen.MovieDetail.arguments
             ) {
-                PlaceholderScreen(label = "Movie Detail — coming in Phase 4")
+                MovieDetailScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(label: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = label)
     }
 }

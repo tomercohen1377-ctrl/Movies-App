@@ -1,5 +1,9 @@
 package com.tcohen.moviesapp.di
 
+import android.content.Context
+import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.tcohen.moviesapp.BuildConfig
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
@@ -7,6 +11,7 @@ import com.tcohen.moviesapp.data.remote.interceptor.AuthInterceptor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -28,7 +33,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuthInterceptor(): AuthInterceptor = AuthInterceptor(BuildConfig.TMDB_API_KEY)
+    fun provideAuthInterceptor(): AuthInterceptor = AuthInterceptor(BuildConfig.TMDB_READ_ACCESS_TOKEN)
 
     @Provides
     @Singleton
@@ -66,29 +71,38 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideTmdbApiService(retrofit: Retrofit): TmdbApiService {
-        return retrofit.create(TmdbApiService::class.java)
-    }
+    fun provideTmdbApiService(retrofit: Retrofit): TmdbApiService =
+        retrofit.create(TmdbApiService::class.java)
 
-    // -------------------------------------------------------------------------
-    // Constants — directly in the object since Kotlin objects have no companion
-    // -------------------------------------------------------------------------
+    /**
+     * Provides a Coil [ImageLoader] that:
+     * - Shares the same [OkHttpClient] as Retrofit (unified cache budget + auth headers)
+     * - Stores images on disk for up to 1 day (enforced by OkHttp's Cache-Control interceptor)
+     * - Uses a 100 MB disk cache and a 25% memory cache
+     */
+    @Provides
+    @Singleton
+    fun provideImageLoader(
+        @ApplicationContext context: Context,
+        okHttpClient: OkHttpClient
+    ): ImageLoader = ImageLoader.Builder(context)
+        .okHttpClient(okHttpClient)
+        .memoryCache {
+            MemoryCache.Builder(context)
+                .maxSizePercent(0.25)
+                .build()
+        }
+        .diskCache {
+            DiskCache.Builder()
+                .directory(context.cacheDir.resolve("image_cache"))
+                .maxSizeBytes(IMAGE_CACHE_MAX_SIZE_BYTES)
+                .build()
+        }
+        .crossfade(true)
+        .build()
 
-    /** OkHttp header name for HTTP cache control directives. */
     const val HEADER_CACHE_CONTROL = "Cache-Control"
-
-    /**
-     * Instructs caches to store responses for exactly one day (86 400 s)
-     * and revalidate afterwards. Applied to every network response.
-     */
     const val CACHE_CONTROL_ONE_DAY = "max-age=86400, must-revalidate"
-
-    /** MIME type used for JSON request/response bodies with Retrofit. */
     const val CONTENT_TYPE_JSON = "application/json"
-
-    /**
-     * Maximum disk-cache budget for Coil's image cache (100 MB).
-     * Long to avoid silent Int overflow when computing byte sizes.
-     */
     const val IMAGE_CACHE_MAX_SIZE_BYTES = 100L * 1024 * 1024
 }
