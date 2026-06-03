@@ -42,18 +42,19 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture bre
 
 ## Features
 
-| Feature | Status |
+| Feature | Notes |
 |---|---|
-| Movie list with poster images | ✅ |
-| Category filter (Upcoming / Top Rated / Now Playing) | ✅ |
-| Movie details screen (poster, description, release year, rating) | ✅ |
-| Smooth screen transition animations | ✅ |
-| Favorites tab | ✅ |
-| Image caching (1-day expiration) | ✅ |
-| Infinite scrolling / pagination | ✅ |
-| Unit tests | ✅ (Bonus) |
-| Trailer playback | ✅ (Bonus) |
-| Offline handling | ✅ (Bonus) |
+| Movie grid with full-bleed poster cards | Home tab, `LazyVerticalGrid` |
+| Expandable category dropdown filter | Material 3 `ExposedDropdownMenuBox` on Home screen |
+| Movie details screen | Poster, description, release year, rating, genres |
+| Smooth screen transition animations | Shared element / `Crossfade` |
+| 2-tab bottom navigation (Home + Favorites) | No other tabs |
+| Embedded trailer player at top of detail screen | WebView YouTube embed / ExoPlayer |
+| Favorites tab | Saved movies grid, swipe-to-remove |
+| Image caching with 1-day expiration | Coil `DiskCache` + OkHttp `Cache-Control` |
+| Infinite scrolling / pagination | Paging 3 |
+| Offline: scroll cached data freely | Network error only when live API is needed |
+| Unit tests for every ViewModel and UI component | MockK, Turbine, Compose UI Test |
 
 ---
 
@@ -70,7 +71,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture bre
 | Local storage | Room |
 | Async | Kotlin Coroutines + Flow |
 | Paging | Paging 3 |
-| Video | YouTube Player / ExoPlayer |
+| Video | Media3 ExoPlayer / WebView YouTube embed (inline, top of detail screen) |
 | Testing | JUnit4, MockK, Turbine |
 
 ---
@@ -130,9 +131,9 @@ See [`docs/TECHNICAL_DECISIONS.md`](docs/TECHNICAL_DECISIONS.md) for the full re
 
 ## Limitations
 
-- Trailer playback requires a YouTube account/app on device (uses Intent or embedded player).
-- Offline mode shows only previously cached data; no background sync.
-- Favorites are stored locally (no cloud sync).
+- Trailer playback requires internet (embedded YouTube iframe); no offline trailer support.
+- Cached movie pages are available offline; movie detail and trailers require a live connection.
+- Favorites are stored locally — no cloud sync across devices.
 
 ---
 

@@ -21,20 +21,13 @@ UiIntent    — user actions (e.g. LoadMovies, SelectCategory, ToggleFavorite)
 UiEffect    — one-shot side effects (e.g. NavigateToDetail, ShowError)
 ```
 
-**Example (Movie List):**
-```
-MovieListState   → data class holding list, selected category, loading/error flags
-MovieListIntent  → LoadMovies, SelectCategory(category), RefreshMovies, OpenDetail(id)
-MovieListEffect  → NavigateToDetail(id), ShowSnackbar(message)
-```
-
 ---
 
 ### 2. Domain Layer
 
 - Pure Kotlin — **no Android dependencies**.
 - Contains:
-  - **Domain Models**: Plain Kotlin data classes (e.g. `Movie`, `MovieDetail`, `Category`).
+  - **Domain Models**: Plain Kotlin data classes (`Movie`, `MovieDetail`, `VideoResult`, `Category`).
   - **Repository Interfaces**: Contracts the data layer must fulfill.
   - **Use Cases**: Single-responsibility classes that encapsulate one piece of business logic.
 
@@ -43,10 +36,10 @@ MovieListEffect  → NavigateToDetail(id), ShowSnackbar(message)
 |---|---|
 | `GetMoviesUseCase` | Fetch paginated movie list by category |
 | `GetMovieDetailUseCase` | Fetch full details for a single movie |
-| `GetMovieTrailerUseCase` | Fetch trailer video key |
+| `GetMovieTrailerUseCase` | Fetch trailer video key (returns null if offline) |
 | `ToggleFavoriteUseCase` | Add/remove a movie from favorites |
 | `GetFavoritesUseCase` | Observe the favorites list from local DB |
-| `SearchMoviesUseCase` | (Bonus) Search movies by query |
+| `IsFavoriteUseCase` | Observe whether a single movie is favorited |
 
 ---
 
@@ -62,12 +55,95 @@ Composed of two data sources, coordinated by a Repository implementation:
 
 #### Local (Database)
 - **Room** database for persisting favorites and cached movie data.
-- Entities: `MovieEntity`, `FavoriteEntity`.
-- DAOs: `MovieDao`, `FavoriteDao`.
+- Entities: `MovieEntity` (category-keyed movie cache), `FavoriteEntity`.
+- DAOs: `MovieDao` (cache read/write), `FavoriteDao`.
 
 #### Repository Implementation
 - `MovieRepositoryImpl` coordinates between remote and local sources.
-- Implements an **offline-first** strategy where applicable: serve cached data first, then refresh from network.
+- **Offline-first for browsing:** serves cached pages from Room when offline; triggers a targeted `NetworkUnavailableException` only when going beyond cached data or fetching detail/trailer.
+
+---
+
+## Navigation
+
+### Bottom Navigation — 2 Tabs
+```
+┌──────────────────────────────────┐
+│            Content               │
+│                                  │
+├─────────────┬────────────────────┤
+│  🏠 Home    │  ❤️ Favorites      │
+└─────────────┴────────────────────┘
+```
+
+- **Home tab** → `HomeScreen` (movie grid + category chip row)
+- **Favorites tab** → `FavoritesScreen` (saved movies grid)
+- Both tabs share the `MovieDetail` route; back-stack is managed per tab
+
+**Routes:**
+```
+home          →  moviedetail/{movieId}
+favorites     →  moviedetail/{movieId}
+```
+
+---
+
+## Screen Layouts
+
+### Home Screen
+```
+┌──────────────────────────┐
+│  Top App Bar              │
+├──────────────────────────┤
+│  [Upcoming][Top Rated]…  │  ← horizontally scrollable FilterChip row
+├──────────────────────────┤
+│  ┌──────┐  ┌──────┐      │
+│  │Poster│  │Poster│  … ←─── LazyVerticalGrid of MovieCards
+│  │      │  │      │      │     (full-bleed poster + gradient + title)
+│  └──────┘  └──────┘      │
+│  ┌──────┐  ┌──────┐      │
+│  │      │  │      │      │
+│  └──────┘  └──────┘      │
+│                           │
+│  [Network Error Footer]  │  ← only when paging hits offline boundary
+└──────────────────────────┘
+```
+
+### Movie Detail Screen
+```
+┌──────────────────────────┐
+│  ◀  [Trailer Player]     │  ← 16:9 embedded player AT THE TOP
+│     (or backdrop image)  │     ExoPlayer WebView / YouTube embed
+├──────────────────────────┤
+│  Poster | Title          │
+│         | Year  Runtime  │
+│         | ★ 7.8  (1.2k)  │
+├──────────────────────────┤
+│  [Action] [Drama]        │  ← Genre chips
+├──────────────────────────┤
+│  "Tagline here"          │
+├──────────────────────────┤
+│  Overview paragraph...   │
+│                           │
+│              [❤️ Save]   │  ← Animated FAB
+└──────────────────────────┘
+```
+
+---
+
+## Offline Handling Strategy
+
+The app uses a **tiered offline model** — not a blanket offline banner:
+
+| Scenario | Behaviour |
+|---|---|
+| Browsing cached pages | Scrolls freely, no error shown |
+| Paging beyond cached data while offline | `NetworkErrorFooter` in list — retry button visible |
+| Opening movie detail while offline | Full `ErrorView` with "No internet connection" message |
+| Trailer fetch while offline | `trailerKey = null` → backdrop image shown, no error banner |
+| App comes back online | Paging retries automatically; detail screen shows retry |
+
+`NetworkMonitor` (backed by `ConnectivityManager.NetworkCallback`) exposes `isOnline: Flow<Boolean>` and `isCurrentlyOnline(): Boolean`. It is injected into `MoviePagingSource` and all ViewModels.
 
 ---
 
@@ -78,6 +154,8 @@ User Action (Intent)
         │
         ▼
    ViewModel
+   ├── reads NetworkMonitor.isOnline
+   │
         │  calls
         ▼
    Use Case
@@ -91,7 +169,33 @@ User Action (Intent)
    ▼         ▼
 Remote      Local
 (Retrofit)  (Room)
+  ↑           │
+  │  cache    │ serve cache
+  └───────────┘
 ```
+
+---
+
+## Image Caching
+
+- **Library:** Coil `AsyncImage`
+- **Disk cache:** 100 MB, stored in `cacheDir/image_cache`
+- **Expiration:** 1-day enforced via OkHttp `Cache-Control: max-age=86400, must-revalidate` response header interceptor
+- Same `OkHttpClient` instance is shared between Retrofit and Coil's `ImageLoader` to unify the cache budget
+
+---
+
+## Testing Strategy
+
+> Every ViewModel and every non-trivial UI component has a dedicated test class.
+
+| Test type | Tools | Coverage target |
+|---|---|---|
+| ViewModel unit tests | MockK, Turbine, `kotlinx-coroutines-test` | All ViewModels — every intent/state transition |
+| Use case unit tests | MockK | All use cases |
+| Paging unit tests | MockK | `MoviePagingSource` — online, last page, offline |
+| Repository unit tests | MockK | `MovieRepositoryImpl` |
+| UI component tests | `compose-ui-test`, `TestRule` | All shared composables |
 
 ---
 
@@ -101,24 +205,10 @@ Remote      Local
 
 | Module | Provides |
 |---|---|
-| `NetworkModule` | `Retrofit`, `OkHttpClient`, `TmdbApiService` |
-| `DatabaseModule` | `AppDatabase`, DAOs |
+| `NetworkModule` | `Retrofit`, `OkHttpClient`, `TmdbApiService`, Coil `ImageLoader` |
+| `DatabaseModule` | `AppDatabase`, `MovieDao`, `FavoriteDao` |
 | `RepositoryModule` | Repository interface → implementation bindings |
-
----
-
-## Navigation
-
-A single `NavGraph` defined in `AppNavGraph.kt` handles all routes.
-
-**Routes:**
-```
-MovieList  →  MovieDetail(movieId)
-                    ↑
-Favorites  →  (same MovieDetail route)
-```
-
-Bottom navigation bar switches between `MovieList` and `Favorites` tabs.
+| `UtilModule` | `NetworkMonitor` |
 
 ---
 
@@ -127,6 +217,7 @@ Bottom navigation bar switches between `MovieList` and `Favorites` tabs.
 - ViewModels use `StateFlow` for UI state (hot, always has a value).
 - Side effects use `Channel` → exposed as `Flow` to avoid re-delivery on recomposition.
 - Paging state is handled by **Paging 3**'s `LazyPagingItems` in Compose.
+- `NetworkMonitor.isOnline` flows into ViewModel state so the UI reflects connectivity reactively.
 
 ---
 
@@ -136,7 +227,7 @@ Bottom navigation bar switches between `MovieList` and `Favorites` tabs.
 |---|---|
 | Network calls | `Dispatchers.IO` |
 | DB reads/writes | `Dispatchers.IO` |
-| Business logic | `Dispatchers.Default` (or main-safe via Room/Retrofit) |
+| Business logic | main-safe (Room + Retrofit are main-safe by default) |
 | UI updates | `Dispatchers.Main` (via `StateFlow`) |
 
 ---
@@ -145,8 +236,8 @@ Bottom navigation bar switches between `MovieList` and `Favorites` tabs.
 
 ```
 :app
-  ���── :presentation
-  │     ├── movielist
+  ├── :presentation
+  │     ├── home
   │     ├── moviedetail
   │     └── favorites
   ├── :domain
@@ -155,4 +246,4 @@ Bottom navigation bar switches between `MovieList` and `Favorites` tabs.
         └── local
 ```
 
-> Note: The app currently lives in a single module for time-to-market. Splitting into separate Gradle modules is a clear next step.
+> The app lives in a single Gradle module for time-to-market. The package structure mirrors a multi-module layout, making extraction straightforward as a future step.

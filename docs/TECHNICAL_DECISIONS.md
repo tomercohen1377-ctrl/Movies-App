@@ -111,14 +111,20 @@ This document explains the major technical choices made for the Movies App and t
 
 ---
 
-## Video Playback: YouTube Intent + ExoPlayer (Bonus)
+## Video Playback: Embedded Player Inside Movie Details Screen
 
-**Decision:** Launch YouTube app via Intent as primary path; fall back to embedded ExoPlayer for MP4 trailers.
+**Decision:** Play trailers **inline at the top of the Movie Detail screen** using an embedded `WebView` (YouTube iframe) or `Media3 ExoPlayer`, not via a YouTube Intent.
 
 **Why:**
-- TMDB video results are YouTube keys. The simplest, most reliable approach is to launch the YouTube app.
-- Embedding requires the YouTube Android Player API (deprecated) or a WebView workaround.
-- ExoPlayer (Media3) handles non-YouTube sources and provides full control over playback UI.
+- Requirement explicitly states trailers must play **inside the app** at the **top of the detail screen** — launching an external app would violate this.
+- The YouTube iframe embed API (`https://www.youtube.com/embed/{key}?autoplay=1`) is the simplest reliable path: just a `WebView` inside an `AndroidView` composable, no deprecated SDK needed.
+- `Media3 ExoPlayer` is the fallback for non-YouTube (MP4/HLS) sources and gives full control over the player UI (play/pause, fullscreen button, progress bar).
+- The trailer section is 16:9 and sits at the very top of the screen, above all movie metadata, so the user sees it immediately on open.
+
+**Offline behaviour:**
+- If the device is offline or the trailer key fetch returns null, the trailer section gracefully degrades to showing the backdrop image — no crash, no error banner.
+
+**Alternative considered:** YouTube Android Player SDK. Rejected — deprecated since 2023 and requires a Google account sign-in on the device.
 
 ---
 
@@ -130,6 +136,42 @@ This document explains the major technical choices made for the Movies App and t
 - `local.properties` is gitignored by default — the key never enters version control.
 - `BuildConfig` injection is the standard Android approach for environment-specific secrets.
 - For a production app, keys should additionally be obfuscated with ProGuard/R8 or fetched from a backend at runtime.
+
+---
+
+## Category Filter: Horizontal Scrollable Chip Row
+
+**Decision:** Use a `LazyRow` of Material 3 `FilterChip`s for category selection.
+
+**Why:**
+- All three category options (Upcoming, Top Rated, Now Playing) are visible at a glance — no tap required to discover them.
+- `FilterChip` with `selected = true` provides clear visual feedback (filled tint + checkmark) about the active filter, which is better affordance than a dropdown label that shows only the current selection.
+- `LazyRow` keeps the layout horizontally scrollable so more categories can be added in the future without a layout redesign.
+- Chips sit persistently below the top bar, making the filter always accessible without an extra tap to open a menu.
+
+---
+
+## Offline Strategy: Tiered (Not Blanket Banner)
+
+**Decision:** Allow scrolling through cached data when offline. Only show an error when a live network call is specifically required.
+
+**Why:**
+- A blanket "You are offline" overlay that blocks the entire UI is a poor UX. The user likely wants to browse movies they already loaded.
+- **Paging 3's `PagingSource`** is the right place to enforce this: pages already in Room are served locally; hitting a page beyond the cache while offline returns `LoadResult.Error`, which Paging renders as a footer-level error — not a full-screen takeover.
+- Movie Detail and Trailer fetches are inherently live (we don't cache full detail or video keys) so they surface a proper error state. The user knows why it failed without the app becoming unusable.
+- This mirrors how apps like Netflix and Spotify handle offline — content you have is accessible; fresh content requires connectivity.
+
+---
+
+## Unit Tests: Every ViewModel and UI Component
+
+**Decision:** Write unit tests for every ViewModel and every non-trivial UI composable — not just "critical paths".
+
+**Why:**
+- Requirement explicitly states this scope.
+- ViewModel tests with `Turbine` + `kotlinx-coroutines-test` are fast, deterministic, and catch intent → state regressions immediately.
+- Compose UI tests with `compose-ui-test` verify component rendering and interaction without needing a device.
+- This discipline also keeps ViewModels lean: if a ViewModel is hard to test, it's a signal the logic is too complex and should be extracted to a use case.
 
 ---
 
