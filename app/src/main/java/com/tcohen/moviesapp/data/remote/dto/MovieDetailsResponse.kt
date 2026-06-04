@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class MovieDetailDto(
+data class MovieDetailsResponse(
     @SerialName("id") val id: Int,
     @SerialName("title") val title: String,
     @SerialName("overview") val overview: String,
@@ -15,11 +15,11 @@ data class MovieDetailDto(
     @SerialName("vote_count") val voteCount: Int = 0,
     @SerialName("runtime") val runtime: Int? = null,
     @SerialName("tagline") val tagline: String? = null,
-    @SerialName("genres") val genres: List<GenreDto> = emptyList()
+    @SerialName("genres") val genres: List<GenreResponse> = emptyList()
 )
 
 @Serializable
-data class GenreDto(
+data class GenreResponse(
     @SerialName("id") val id: Int,
     @SerialName("name") val name: String
 )

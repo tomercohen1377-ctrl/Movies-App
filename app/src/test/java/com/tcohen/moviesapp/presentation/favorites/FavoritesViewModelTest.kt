@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.fakeMovie
 import com.tcohen.moviesapp.util.MainDispatcherRule
+import com.tcohen.moviesapp.util.NetworkMonitor
 import io.mockk.coJustRun
 import io.mockk.coVerify
 import io.mockk.every
@@ -13,6 +14,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -25,16 +27,18 @@ class FavoritesViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val repository: MovieRepository = mockk()
+    private val networkMonitor: NetworkMonitor = mockk()
 
     private lateinit var viewModel: FavoritesViewModel
 
     @Before
     fun setUp() {
-        // favoriteChanges drives flatMapLatest in the ViewModel; use an empty flow so
-        // it doesn't emit after onStart and cause extra getFavorites calls.
+        // favoriteChanges drives flatMapLatest in the ViewModel.
         every { repository.favoriteChanges } returns flowOf()
         every { repository.getFavorites() } returns flowOf(PagingData.empty())
-        viewModel = FavoritesViewModel(repository)
+        // Default: online
+        every { networkMonitor.isOnline } returns flowOf(true)
+        viewModel = FavoritesViewModel(repository, networkMonitor)
     }
 
     // ── OpenDetail ────────────────────────────────────────────────────────────
@@ -63,14 +67,26 @@ class FavoritesViewModelTest {
     }
 
     @Test
-    fun `RemoveFavorite increments refresh trigger after toggleFavorite`() = runTest {
+    fun `RemoveFavorite calls toggleFavorite exactly once per intent`() = runTest {
         val movie = fakeMovie(id = 5)
         coJustRun { repository.toggleFavorite(movie) }
 
-        // Each RemoveFavorite should trigger a refresh (i.e. getFavorites is re-subscribed)
         viewModel.processIntent(FavoritesIntent.RemoveFavorite(movie))
 
-        // toggleFavorite called once per remove intent
         coVerify(exactly = 1) { repository.toggleFavorite(movie) }
+    }
+
+    // ── Offline state ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `isOffline is false when network is available`() = runTest {
+        assertFalse(viewModel.state.value.isOffline)
+    }
+
+    @Test
+    fun `isOffline becomes true when network is lost`() = runTest {
+        every { networkMonitor.isOnline } returns flowOf(false)
+        val vm = FavoritesViewModel(repository, networkMonitor)
+        assertTrue(vm.state.value.isOffline)
     }
 }

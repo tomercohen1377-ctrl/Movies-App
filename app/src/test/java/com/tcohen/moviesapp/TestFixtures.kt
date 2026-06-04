@@ -2,12 +2,12 @@ package com.tcohen.moviesapp
 
 import com.tcohen.moviesapp.data.local.entity.FavoriteEntity
 import com.tcohen.moviesapp.data.local.entity.MovieEntity
-import com.tcohen.moviesapp.data.remote.dto.GenreDto
-import com.tcohen.moviesapp.data.remote.dto.MovieDetailDto
-import com.tcohen.moviesapp.data.remote.dto.MovieDto
-import com.tcohen.moviesapp.data.remote.dto.MovieListResponseDto
-import com.tcohen.moviesapp.data.remote.dto.VideoDto
-import com.tcohen.moviesapp.data.remote.dto.VideoListResponseDto
+import com.tcohen.moviesapp.data.remote.dto.GenreResponse
+import com.tcohen.moviesapp.data.remote.dto.MovieDetailsResponse
+import com.tcohen.moviesapp.data.remote.dto.MovieResponse
+import com.tcohen.moviesapp.data.remote.dto.MovieListResponse
+import com.tcohen.moviesapp.data.remote.dto.VideoResponse
+import com.tcohen.moviesapp.data.remote.dto.VideoListResponse
 import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.domain.model.Movie
@@ -65,7 +65,7 @@ fun fakeVideoResult(key: String = "dQw4w9WgXcQ") = VideoResult(
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
-fun fakeMovieDto(id: Int = 1) = MovieDto(
+fun fakeMovieDto(id: Int = 1) = MovieResponse(
     id = id,
     title = "Test Movie $id",
     overview = "Overview $id",
@@ -76,7 +76,7 @@ fun fakeMovieDto(id: Int = 1) = MovieDto(
     voteCount = 1000
 )
 
-fun fakeMovieDetailDto(id: Int = 1) = MovieDetailDto(
+fun fakeMovieDetailDto(id: Int = 1) = MovieDetailsResponse(
     id = id,
     title = "Test Movie $id",
     overview = "Overview $id",
@@ -87,14 +87,14 @@ fun fakeMovieDetailDto(id: Int = 1) = MovieDetailDto(
     voteCount = 1000,
     runtime = 120,
     tagline = "A tagline",
-    genres = listOf(GenreDto(28, "Action"))
+    genres = listOf(GenreResponse(28, "Action"))
 )
 
 fun fakeMovieListResponse(
     page: Int = 1,
     totalPages: Int = 5,
     count: Int = 20
-) = MovieListResponseDto(
+) = MovieListResponse(
     page = page,
     results = (1..count).map { fakeMovieDto(it + (page - 1) * count) },
     totalPages = totalPages,
@@ -104,13 +104,11 @@ fun fakeMovieListResponse(
 fun fakeVideoListResponse(
     movieId: Int = 1,
     trailerKey: String? = "abc123"
-) = VideoListResponseDto(
+) = VideoListResponse(
     id = movieId,
     results = if (trailerKey != null) listOf(
-        VideoDto(
-            id = "v1",
+        VideoResponse(
             key = trailerKey,
-            name = "Official Trailer",
             site = "YouTube",
             type = "Trailer",
             official = true,

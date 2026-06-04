@@ -16,7 +16,7 @@ import kotlinx.serialization.Serializable
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-data class FavoriteRequestDto(
+data class FavoriteRequest(
     @EncodeDefault @SerialName("media_type") val mediaType: String = "movie",
     @SerialName("media_id") val mediaId: Int,
     @SerialName("favorite") val favorite: Boolean

@@ -6,6 +6,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.domain.repository.MovieRepository
+import com.tcohen.moviesapp.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -15,19 +16,27 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class FavoritesViewModel @Inject constructor(
-    private val repository: MovieRepository
+    private val repository: MovieRepository,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
+
+    // ── State ─────────────────────────────────────────────────────────────────
 
     private val _state = MutableStateFlow(FavoritesState())
     val state: StateFlow<FavoritesState> = _state.asStateFlow()
 
+    // ── Effects ───────────────────────────────────────────────────────────────
+
     private val _effects = Channel<FavoritesEffect>(Channel.BUFFERED)
     val effects: Flow<FavoritesEffect> = _effects.receiveAsFlow()
+
+    // ── Paging ────────────────────────────────────────────────────────────────
 
     /**
      * Paginated favorites stream.
@@ -42,12 +51,22 @@ class FavoritesViewModel @Inject constructor(
         .flatMapLatest { repository.getFavorites() }
         .cachedIn(viewModelScope)
 
+    // ── Init ──────────────────────────────────────────────────────────────────
+
+    init {
+        observeNetworkStatus()
+    }
+
+    // ── Intent handler ────────────────────────────────────────────────────────
+
     fun processIntent(intent: FavoritesIntent) {
         when (intent) {
             is FavoritesIntent.OpenDetail -> openDetail(intent.movieId)
             is FavoritesIntent.RemoveFavorite -> removeFavorite(intent.movie)
         }
     }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun openDetail(movieId: Int) {
         viewModelScope.launch {
@@ -58,6 +77,14 @@ class FavoritesViewModel @Inject constructor(
     private fun removeFavorite(movie: Movie) {
         viewModelScope.launch {
             repository.toggleFavorite(movie)
+        }
+    }
+
+    private fun observeNetworkStatus() {
+        viewModelScope.launch {
+            networkMonitor.isOnline.collect { isOnline ->
+                _state.update { it.copy(isOffline = !isOnline) }
+            }
         }
     }
 }

@@ -32,13 +32,15 @@ class MoviePagingSourceTest {
 
     @Before
     fun setUp() {
+        // Stubs needed by the online path
         coJustRun { movieDao.insertAll(any()) }
+        coJustRun { movieDao.deleteByCategory(any()) }
     }
 
     private fun createSource(category: Category = Category.UPCOMING) =
         MoviePagingSource(apiService, movieDao, category, networkMonitor)
 
-    // ── Online path ──────────────────────────────────────────────────��────────
+    // ── Online path ───────────────────────────────────────────────────────────
 
     @Test
     fun `online - first page loaded with correct nextKey`() = runTest {
@@ -58,10 +60,6 @@ class MoviePagingSourceTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
         coEvery { apiService.getUpcomingMovies(3) } returns fakeMovieListResponse(page = 3, totalPages = 3)
 
-        val pager = TestPager(pagingConfig, createSource())
-        pager.refresh() // page 1
-
-        // Simulate jumping to page 3 (last)
         val source = createSource()
         val result = source.load(
             PagingSource.LoadParams.Refresh(key = 3, loadSize = 20, placeholdersEnabled = false)
@@ -105,6 +103,17 @@ class MoviePagingSourceTest {
     }
 
     @Test
+    fun `online - page 1 deletes stale cache before inserting`() = runTest {
+        every { networkMonitor.isCurrentlyOnline() } returns true
+        coEvery { apiService.getUpcomingMovies(1) } returns fakeMovieListResponse()
+
+        val pager = TestPager(pagingConfig, createSource())
+        pager.refresh()
+
+        io.mockk.coVerify { movieDao.deleteByCategory(Category.UPCOMING.name) }
+    }
+
+    @Test
     fun `online - API error returns LoadResult Error`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
         coEvery { apiService.getUpcomingMovies(1) } throws RuntimeException("HTTP 500")
@@ -136,9 +145,9 @@ class MoviePagingSourceTest {
     }
 
     @Test
-    fun `offline - beyond cached pages returns NetworkUnavailableException`() = runTest {
+    fun `offline - no cached data returns NetworkUnavailableException`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns false
-        coEvery { movieDao.getMoviesByCategory(Category.UPCOMING.name) } returns emptyList()
+        coEvery { movieDao.getMoviesByCategory(any()) } returns emptyList()
 
         val source = createSource()
         val result = source.load(
@@ -169,7 +178,7 @@ class MoviePagingSourceTest {
         every { networkMonitor.isCurrentlyOnline() } returns false
         val cachedEntities = (1..5).map { fakeMovieEntity(id = it, page = 1) }
         coEvery { movieDao.getMoviesByCategory(any()) } returns cachedEntities
-        coEvery { movieDao.getLastCachedPage(any()) } returns 3  // page 1 of 3
+        coEvery { movieDao.getLastCachedPage(any()) } returns 3
 
         val source = createSource()
         val result = source.load(

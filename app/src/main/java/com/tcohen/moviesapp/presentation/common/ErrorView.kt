@@ -17,7 +17,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
+
+@Preview(showBackground = true)
+@Composable
+private fun ErrorViewPreview() {
+    MoviesAppTheme {
+        ErrorView(
+            message = "Failed to load movies. Please check your connection.",
+            onRetry = {}
+        )
+    }
+}
 
 /** Full-screen error state with an icon, message, and retry button. */
 @Composable

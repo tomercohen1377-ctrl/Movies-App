@@ -15,7 +15,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 import java.util.Locale
+
+@Preview(showBackground = true)
+@Composable
+private fun RatingBadgePreview() {
+    MoviesAppTheme {
+        RatingBadge(rating = 8.4)
+    }
+}
 
 @Composable
 fun RatingBadge(

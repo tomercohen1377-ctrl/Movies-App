@@ -16,25 +16,12 @@ interface FavoriteDao {
     @Query("DELETE FROM favorites WHERE id = :movieId")
     suspend fun deleteById(movieId: Int)
 
-    @Query("SELECT * FROM favorites ORDER BY savedAt DESC")
-    fun observeAll(): Flow<List<FavoriteEntity>>
+    @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE id = :movieId)")
+    fun observeIsFavorite(movieId: Int): Flow<Boolean>
 
     @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE id = :movieId)")
-    fun isFavorite(movieId: Int): Flow<Boolean>
+    suspend fun isFavorite(movieId: Int): Boolean
 
-    @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE id = :movieId)")
-    suspend fun isFavoriteOnce(movieId: Int): Boolean
-
-    /** Returns all stored favorite movie IDs (used for server-sync diffing). */
-    @Query("SELECT id FROM favorites")
-    suspend fun getAllIds(): List<Int>
-
-    /**
-     * Returns a page of favorites ordered by `savedAt` descending.
-     *
-     * Fetching [limit] + 1 items lets the caller check if a next page exists
-     * without a separate COUNT query.
-     */
     @Query("SELECT * FROM favorites ORDER BY savedAt DESC LIMIT :limit OFFSET :offset")
     suspend fun getFavoritesPaged(limit: Int, offset: Int): List<FavoriteEntity>
 }

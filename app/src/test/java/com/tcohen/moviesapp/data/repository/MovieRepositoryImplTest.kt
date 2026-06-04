@@ -3,7 +3,7 @@ package com.tcohen.moviesapp.data.repository
 import com.tcohen.moviesapp.data.local.dao.FavoriteDao
 import com.tcohen.moviesapp.data.local.dao.MovieDao
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
-import com.tcohen.moviesapp.data.remote.dto.VideoDto
+import com.tcohen.moviesapp.data.remote.dto.VideoResponse
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.fakeFavoriteEntity
 import com.tcohen.moviesapp.fakeMovie
@@ -11,11 +11,13 @@ import com.tcohen.moviesapp.fakeMovieDetailDto
 import com.tcohen.moviesapp.fakeVideoListResponse
 import com.tcohen.moviesapp.util.MainDispatcherRule
 import com.tcohen.moviesapp.util.NetworkMonitor
+import com.tcohen.moviesapp.util.NetworkResult
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.Assert.assertTrue
 import androidx.paging.testing.asSnapshot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -42,67 +44,63 @@ class MovieRepositoryImplTest {
     private val repository: MovieRepositoryImpl by lazy {
         MovieRepositoryImpl(
             apiService, movieDao, favoriteDao, networkMonitor,
-            accountId = "", sessionId = "", favoritesListId = ""
+            accountId = "", sessionId = ""
         )
     }
 
     // ── getMovieDetail ────────────────────────────────────────────────────────
 
     @Test
-    fun `getMovieDetail returns mapped domain object`() = runTest {
+    fun `getMovieDetail returns Success with mapped domain object`() = runTest {
         val dto = fakeMovieDetailDto(id = 5)
-        coEvery { apiService.getMovieDetail(5) } returns dto
+        coEvery { apiService.getMovieDetails(5) } returns dto
 
-        val result = repository.getMovieDetail(5)
+        val result = repository.getMovieDetail(5) as NetworkResult.Success
 
-        assertEquals(5, result.id)
-        assertEquals("Test Movie 5", result.title)
-        assertEquals(120, result.runtime)
+        assertEquals(5, result.data.id)
+        assertEquals("Test Movie 5", result.data.title)
+        assertEquals(120, result.data.runtime)
     }
 
     @Test
-    fun `getMovieDetail propagates exception from API`() = runTest {
-        coEvery { apiService.getMovieDetail(any()) } throws RuntimeException("Not found")
+    fun `getMovieDetail returns NetworkError when API throws`() = runTest {
+        coEvery { apiService.getMovieDetails(any()) } throws java.io.IOException("connection refused")
 
-        var threw = false
-        try {
-            repository.getMovieDetail(999)
-        } catch (_: RuntimeException) {
-            threw = true
-        }
-        assert(threw)
+        val result = repository.getMovieDetail(999)
+
+        assertTrue(result is NetworkResult.Error)
     }
 
-    // ── getTrailer ────────────────────────────────────────────────────────────
+    // ── getTrailer ────────���───────────────────────────────────────────────────
 
     @Test
-    fun `getTrailer returns YouTube trailer key when online`() = runTest {
+    fun `getTrailer returns Success with YouTube trailer key when online`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
         coEvery { apiService.getMovieVideos(1) } returns fakeVideoListResponse(trailerKey = "abc123")
 
-        val result = repository.getTrailer(1)
+        val result = repository.getTrailer(1) as NetworkResult.Success
 
-        assertNotNull(result)
-        assertEquals("abc123", result?.key)
+        assertNotNull(result.data)
+        assertEquals("abc123", result.data?.key)
     }
 
     @Test
-    fun `getTrailer returns null when offline`() = runTest {
+    fun `getTrailer returns Success with null when offline`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns false
 
-        val result = repository.getTrailer(1)
+        val result = repository.getTrailer(1) as NetworkResult.Success
 
-        assertNull(result)
+        assertNull(result.data)
     }
 
     @Test
-    fun `getTrailer returns null when no YouTube trailers exist`() = runTest {
+    fun `getTrailer returns Success with null when no YouTube trailers exist`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
         coEvery { apiService.getMovieVideos(1) } returns fakeVideoListResponse(trailerKey = null)
 
-        val result = repository.getTrailer(1)
+        val result = repository.getTrailer(1) as NetworkResult.Success
 
-        assertNull(result)
+        assertNull(result.data)
     }
 
     @Test
@@ -110,13 +108,13 @@ class MovieRepositoryImplTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
         val response = fakeVideoListResponse().copy(
             results = listOf(
-                VideoDto(
-                    id = "v1", key = "unofficial_key", name = "Fan Trailer",
+                VideoResponse(
+                    key = "unofficial_key",
                     site = "YouTube", type = "Trailer", official = false,
                     publishedAt = "2024-06-01T00:00:00.000Z"
                 ),
-                VideoDto(
-                    id = "v2", key = "official_key", name = "Official Trailer",
+                VideoResponse(
+                    key = "official_key",
                     site = "YouTube", type = "Trailer", official = true,
                     publishedAt = "2024-01-01T00:00:00.000Z"
                 )
@@ -124,7 +122,7 @@ class MovieRepositoryImplTest {
         )
         coEvery { apiService.getMovieVideos(1) } returns response
 
-        val result = repository.getTrailer(1)
+        val result = (repository.getTrailer(1) as NetworkResult.Success).data
 
         assertEquals("official_key", result?.key)
     }
@@ -134,8 +132,8 @@ class MovieRepositoryImplTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
         val response = fakeVideoListResponse().copy(
             results = listOf(
-                VideoDto(
-                    id = "v1", key = "vimeo_key", name = "Vimeo Trailer",
+                VideoResponse(
+                    key = "vimeo_key",
                     site = "Vimeo", type = "Trailer", official = true,
                     publishedAt = "2024-01-01T00:00:00.000Z"
                 )
@@ -143,7 +141,7 @@ class MovieRepositoryImplTest {
         )
         coEvery { apiService.getMovieVideos(1) } returns response
 
-        val result = repository.getTrailer(1)
+        val result = (repository.getTrailer(1) as NetworkResult.Success).data
 
         assertNull(result)
     }
@@ -153,7 +151,7 @@ class MovieRepositoryImplTest {
     @Test
     fun `toggleFavorite inserts when movie is not already favorited`() = runTest {
         val movie = fakeMovie(id = 3)
-        coEvery { favoriteDao.isFavoriteOnce(3) } returns false
+        coEvery { favoriteDao.isFavorite(3) } returns false
         coJustRun { favoriteDao.insert(any()) }
 
         repository.toggleFavorite(movie)
@@ -164,7 +162,7 @@ class MovieRepositoryImplTest {
     @Test
     fun `toggleFavorite deletes when movie is already favorited`() = runTest {
         val movie = fakeMovie(id = 4)
-        coEvery { favoriteDao.isFavoriteOnce(4) } returns true
+        coEvery { favoriteDao.isFavorite(4) } returns true
         coJustRun { favoriteDao.deleteById(4) }
 
         repository.toggleFavorite(movie)
@@ -204,18 +202,18 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `isFavorite returns true when movie is favorited`() = runTest {
-        every { favoriteDao.isFavorite(5) } returns flowOf(true)
+        every { favoriteDao.observeIsFavorite(5) } returns flowOf(true)
 
-        val result = repository.isFavorite(5).first()
+        val result = repository.observeIsFavorite(5).first()
 
         assert(result)
     }
 
     @Test
     fun `isFavorite returns false when movie is not favorited`() = runTest {
-        every { favoriteDao.isFavorite(5) } returns flowOf(false)
+        every { favoriteDao.observeIsFavorite(5) } returns flowOf(false)
 
-        val result = repository.isFavorite(5).first()
+        val result = repository.observeIsFavorite(5).first()
 
         assert(!result)
     }

@@ -1,6 +1,6 @@
 package com.tcohen.moviesapp.data.mapper
 
-import com.tcohen.moviesapp.data.remote.dto.GenreDto
+import com.tcohen.moviesapp.data.remote.dto.GenreResponse
 import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.fakeMovieDetailDto
@@ -14,7 +14,7 @@ import org.junit.Test
 
 class MovieMapperTest {
 
-    // ── MovieDto → Movie ─────────────────────────────────────��────────────────
+    // ── MovieResponse → Movie ─────────────────────────────────────��────────────────
 
     @Test
     fun `MovieDto toDomain maps all fields correctly`() {
@@ -78,7 +78,7 @@ class MovieMapperTest {
     @Test
     fun `MovieDetailDto toDomain maps multiple genres`() {
         val dto = fakeMovieDetailDto().copy(
-            genres = listOf(GenreDto(28, "Action"), GenreDto(12, "Adventure"))
+            genres = listOf(GenreResponse(28, "Action"), GenreResponse(12, "Adventure"))
         )
         val domain = dto.toDomain()
         assertEquals(2, domain.genres.size)
@@ -86,11 +86,11 @@ class MovieMapperTest {
         assertEquals("Adventure", domain.genres[1].name)
     }
 
-    // ── GenreDto → Genre ──────────────────────────────────────────────────────
+    // ── GenreResponse → GenreResponse ──────────────────────────────────────────────────────
 
     @Test
     fun `GenreDto toDomain maps id and name`() {
-        val dto = GenreDto(id = 99, name = "Sci-Fi")
+        val dto = GenreResponse(id = 99, name = "Sci-Fi")
         val domain = dto.toDomain()
         assertEquals(99, domain.id)
         assertEquals("Sci-Fi", domain.name)

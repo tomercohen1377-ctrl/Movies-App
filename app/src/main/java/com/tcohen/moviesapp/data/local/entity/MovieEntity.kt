@@ -14,7 +14,5 @@ data class MovieEntity(
     val voteAverage: Double,
     val voteCount: Int,
     val category: String,
-    val page: Int,
-    /** Unix epoch millis when this row was fetched from the server. Used for cache expiry. */
-    val cachedAt: Long = 0L
+    val page: Int
 )

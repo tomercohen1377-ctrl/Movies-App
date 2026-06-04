@@ -11,11 +11,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
+
+@Preview(showBackground = true)
+@Composable
+private fun NetworkErrorFooterPreview() {
+    MoviesAppTheme {
+        NetworkErrorFooter(onRetry = {})
+    }
+}
 
 /**
  * Inline footer shown at the bottom of the movie list when paging hits a
- * [NetworkUnavailableException] — i.e. the user scrolled past the cached pages
+ * `NetworkUnavailableException` — i.e. the user scrolled past the cached pages
  * while offline. The list above remains scrollable.
  */
 @Composable

@@ -8,9 +8,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.displayName
+import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 
 /**
  * Horizontally scrollable row of [FilterChip]s — one per [Category].
@@ -36,5 +38,16 @@ fun CategoryFilterRow(
                 label = { Text(text = category.displayName) }
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CategoryFilterRowPreview() {
+    MoviesAppTheme {
+        CategoryFilterRow(
+            selectedCategory = Category.NOW_PLAYING,
+            onCategorySelected = {}
+        )
     }
 }

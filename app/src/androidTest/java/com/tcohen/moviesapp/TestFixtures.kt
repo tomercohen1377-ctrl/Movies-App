@@ -1,6 +1,5 @@
 package com.tcohen.moviesapp
 
-import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.domain.model.MovieDetail

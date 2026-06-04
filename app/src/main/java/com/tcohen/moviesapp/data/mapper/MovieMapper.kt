@@ -2,10 +2,10 @@ package com.tcohen.moviesapp.data.mapper
 
 import com.tcohen.moviesapp.data.local.entity.FavoriteEntity
 import com.tcohen.moviesapp.data.local.entity.MovieEntity
-import com.tcohen.moviesapp.data.remote.dto.GenreDto
-import com.tcohen.moviesapp.data.remote.dto.MovieDetailDto
-import com.tcohen.moviesapp.data.remote.dto.MovieDto
-import com.tcohen.moviesapp.data.remote.dto.VideoDto
+import com.tcohen.moviesapp.data.remote.dto.GenreResponse
+import com.tcohen.moviesapp.data.remote.dto.MovieDetailsResponse
+import com.tcohen.moviesapp.data.remote.dto.MovieResponse
+import com.tcohen.moviesapp.data.remote.dto.VideoResponse
 import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.domain.model.Movie
@@ -14,7 +14,7 @@ import com.tcohen.moviesapp.domain.model.VideoResult
 
 // DTO → Domain
 
-fun MovieDto.toDomain(): Movie = Movie(
+fun MovieResponse.toDomain(): Movie = Movie(
     id = id,
     title = title,
     overview = overview,
@@ -25,7 +25,7 @@ fun MovieDto.toDomain(): Movie = Movie(
     voteCount = voteCount
 )
 
-fun MovieDetailDto.toDomain(): MovieDetail = MovieDetail(
+fun MovieDetailsResponse.toDomain(): MovieDetail = MovieDetail(
     id = id,
     title = title,
     overview = overview,
@@ -39,9 +39,9 @@ fun MovieDetailDto.toDomain(): MovieDetail = MovieDetail(
     genres = genres.map { it.toDomain() }
 )
 
-fun GenreDto.toDomain(): Genre = Genre(id = id, name = name)
+fun GenreResponse.toDomain(): Genre = Genre(id = id, name = name)
 
-fun VideoDto.toDomain(): VideoResult = VideoResult(
+fun VideoResponse.toDomain(): VideoResult = VideoResult(
     key = key,
     site = site,
     type = type,
@@ -86,7 +86,7 @@ fun MovieDetail.toMovie(): Movie = Movie(
     voteCount = voteCount
 )
 
-fun Movie.toEntity(category: Category, page: Int, cachedAt: Long = System.currentTimeMillis()): MovieEntity = MovieEntity(
+fun Movie.toEntity(category: Category, page: Int): MovieEntity = MovieEntity(
     id = id,
     title = title,
     overview = overview,
@@ -96,6 +96,16 @@ fun Movie.toEntity(category: Category, page: Int, cachedAt: Long = System.curren
     voteAverage = voteAverage,
     voteCount = voteCount,
     category = category.name,
-    page = page,
-    cachedAt = cachedAt
+    page = page
+)
+
+fun Movie.toFavoriteEntity() = FavoriteEntity(
+    id = id,
+    title = title,
+    overview = overview,
+    posterPath = posterPath,
+    backdropPath = backdropPath,
+    releaseDate = releaseDate,
+    voteAverage = voteAverage,
+    voteCount = voteCount
 )

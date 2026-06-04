@@ -2,14 +2,11 @@ package com.tcohen.moviesapp.presentation.favorites
 
 import com.tcohen.moviesapp.domain.model.Movie
 
-// ── State ─────────────────────────────────���───────────────────────────────────
+// ── State ────────────────────────────────────────────────────────────────────
 
-/**
- * UI state for the favorites screen.
- * The movie list itself is driven by the Paging 3 flow exposed from the ViewModel.
- * Reserved for future additions (e.g. offline banner, error message).
- */
-class FavoritesState
+data class FavoritesState(
+    val isOffline: Boolean = false
+)
 
 // ── Intents ───────────────────────────────────────────────────────────────────
 
@@ -24,7 +21,7 @@ sealed interface FavoritesIntent {
     data class RemoveFavorite(val movie: Movie) : FavoritesIntent
 }
 
-// ── Effects ───────────────────────────────────────────────────────────────────
+// ── Effects (one-shot) ────────────────────────────────────────────────────────
 
 sealed interface FavoritesEffect {
     data class NavigateToDetail(val movieId: Int) : FavoritesEffect

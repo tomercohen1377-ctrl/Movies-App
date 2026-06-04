@@ -5,6 +5,7 @@ import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.domain.model.MovieDetail
 import com.tcohen.moviesapp.domain.model.VideoResult
+import com.tcohen.moviesapp.util.NetworkResult
 import kotlinx.coroutines.flow.Flow
 
 interface MovieRepository {
@@ -12,14 +13,14 @@ interface MovieRepository {
     /** Returns a [Flow] of paginated [Movie] items for the given [category]. */
     fun getMovies(category: Category): Flow<PagingData<Movie>>
 
-    /** Returns full details for a single movie. Throws if offline and not cached. */
-    suspend fun getMovieDetail(movieId: Int): MovieDetail
+    /** Returns full details for a single movie. */
+    suspend fun getMovieDetail(movieId: Int): NetworkResult<MovieDetail>
 
     /**
-     * Returns the best YouTube trailer key for a movie, or null if none exists
-     * or the device is offline.
+     * Returns the best YouTube trailer for a movie, or [NetworkResult.Success] with
+     * null if none is available / device is offline.
      */
-    suspend fun getTrailer(movieId: Int): VideoResult?
+    suspend fun getTrailer(movieId: Int): NetworkResult<VideoResult?>
 
     /**
      * Adds or removes a movie from the favorites list.
@@ -41,7 +42,9 @@ interface MovieRepository {
     fun getFavorites(): Flow<PagingData<Movie>>
 
     /** Observes whether a specific movie is currently favorited (local, always fast). */
-    fun isFavorite(movieId: Int): Flow<Boolean>
+    fun observeIsFavorite(movieId: Int): Flow<Boolean>
+
+    suspend fun isFavorite(movieId: Int): Boolean
 
     /**
      * Emits [Unit] whenever a favorite is added or removed via [toggleFavorite].

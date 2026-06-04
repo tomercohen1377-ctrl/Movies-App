@@ -5,21 +5,22 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.tcohen.moviesapp.data.local.dao.FavoriteDao
 import com.tcohen.moviesapp.data.local.dao.MovieDao
-import com.tcohen.moviesapp.data.local.entity.FavoriteEntity
 import com.tcohen.moviesapp.data.mapper.toDomain
+import com.tcohen.moviesapp.data.mapper.toFavoriteEntity
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
-import com.tcohen.moviesapp.data.remote.dto.FavoriteRequestDto
-import com.tcohen.moviesapp.data.remote.dto.RemoveFromListRequestDto
-import com.tcohen.moviesapp.data.remote.dto.VideoDto
+import com.tcohen.moviesapp.data.remote.api.safeApiCall
+import com.tcohen.moviesapp.data.remote.dto.FavoriteRequest
+import com.tcohen.moviesapp.data.remote.dto.VideoResponse
 import com.tcohen.moviesapp.data.remote.paging.FavoritesPagingSource
-import com.tcohen.moviesapp.data.remote.paging.FavoritesPagingSource.Companion.FAVORITES_PAGE_SIZE
 import com.tcohen.moviesapp.data.remote.paging.MoviePagingSource
+import com.tcohen.moviesapp.data.remote.paging.PagingDefaults
 import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.domain.model.MovieDetail
 import com.tcohen.moviesapp.domain.model.VideoResult
 import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.util.NetworkMonitor
+import com.tcohen.moviesapp.util.NetworkResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -32,8 +33,7 @@ class MovieRepositoryImpl @Inject constructor(
     private val favoriteDao: FavoriteDao,
     private val networkMonitor: NetworkMonitor,
     @Named("tmdbAccountId") private val accountId: String,
-    @Named("tmdbSessionId") private val sessionId: String,
-    @Named("tmdbFavoritesListId") private val favoritesListId: String
+    @Named("tmdbSessionId") private val sessionId: String
 ) : MovieRepository {
 
     // Emits Unit whenever a favorite is added or removed — used to restart the paging flow.
@@ -43,9 +43,9 @@ class MovieRepositoryImpl @Inject constructor(
     override fun getMovies(category: Category): Flow<PagingData<Movie>> {
         return Pager(
             config = PagingConfig(
-                pageSize = PAGE_SIZE,
+                pageSize = PagingDefaults.PAGE_SIZE,
                 enablePlaceholders = false,
-                prefetchDistance = PREFETCH_DISTANCE
+                prefetchDistance = PagingDefaults.PREFETCH_DISTANCE
             ),
             pagingSourceFactory = {
                 MoviePagingSource(
@@ -58,20 +58,20 @@ class MovieRepositoryImpl @Inject constructor(
         ).flow
     }
 
-    override suspend fun getMovieDetail(movieId: Int): MovieDetail {
-        return apiService.getMovieDetail(movieId).toDomain()
-    }
+    override suspend fun getMovieDetail(movieId: Int): NetworkResult<MovieDetail> =
+        safeApiCall { apiService.getMovieDetails(movieId).toDomain() }
 
-    override suspend fun getTrailer(movieId: Int): VideoResult? {
-        if (!networkMonitor.isCurrentlyOnline()) return null
-        return apiService.getMovieVideos(movieId).results
-            .filter { it.site == VIDEO_SITE_YOUTUBE && it.type == VIDEO_TYPE_TRAILER }
-            .sortedWith(
-                compareByDescending<VideoDto> { it.official }
-                    .thenByDescending { it.publishedAt }
-            )
-            .firstOrNull()
-            ?.toDomain()
+    override suspend fun getTrailer(movieId: Int): NetworkResult<VideoResult?> {
+        return safeApiCall {
+            apiService.getMovieVideos(movieId).results
+                .filter { it.site == VIDEO_SITE_YOUTUBE && it.type == VIDEO_TYPE_TRAILER }
+                .sortedWith(
+                    compareByDescending<VideoResponse> { it.official }
+                        .thenByDescending { it.publishedAt }
+                )
+                .firstOrNull()
+                ?.toDomain()
+        }
     }
 
     /**
@@ -79,15 +79,12 @@ class MovieRepositoryImpl @Inject constructor(
      *
      * **Local update** happens immediately (optimistic UI).
      *
-     * **Server sync** (requires [sessionId]):
-     * - Add: `POST /account/{account_id}/favorite` with `favorite = true`
-     * - Remove: `POST /list/{list_id}/remove_item` when [favoritesListId] is set;
-     *   otherwise `POST /account/{account_id}/favorite` with `favorite = false`
+     * **Server sync**: `POST /account/{account_id}/favorite` with `favorite = true/false`.
      *
      * Server failures are silently ignored — local state is never rolled back.
      */
     override suspend fun toggleFavorite(movie: Movie) {
-        val isCurrentlyFavorite = favoriteDao.isFavoriteOnce(movie.id)
+        val isCurrentlyFavorite = favoriteDao.isFavorite(movie.id)
 
         // 1. Update local immediately for instant UI feedback.
         if (isCurrentlyFavorite) {
@@ -103,29 +100,11 @@ class MovieRepositoryImpl @Inject constructor(
         if (networkMonitor.isCurrentlyOnline() && accountId.isNotEmpty()) {
             val sessionIdOrNull = sessionId.takeIf { it.isNotEmpty() }
             try {
-                if (isCurrentlyFavorite) {
-                    // Remove path: prefer the list-remove endpoint when a list ID is configured.
-                    if (favoritesListId.isNotEmpty()) {
-                        apiService.removeFromList(
-                            listId = favoritesListId,
-                            sessionId = sessionIdOrNull,
-                            body = RemoveFromListRequestDto(mediaId = movie.id)
-                        )
-                    } else {
-                        apiService.markFavorite(
-                            accountId = accountId,
-                            sessionId = sessionIdOrNull,
-                            body = FavoriteRequestDto(mediaId = movie.id, favorite = false)
-                        )
-                    }
-                } else {
-                    // Add path: always use the account favorites endpoint.
-                    apiService.markFavorite(
-                        accountId = accountId,
-                        sessionId = sessionIdOrNull,
-                        body = FavoriteRequestDto(mediaId = movie.id, favorite = true)
-                    )
-                }
+                apiService.markFavorite(
+                    accountId = accountId,
+                    sessionId = sessionIdOrNull,
+                    body = FavoriteRequest(mediaId = movie.id, favorite = !isCurrentlyFavorite)
+                )
             } catch (_: Exception) {
                 // Server sync failure — local state already updated, nothing to undo.
             }
@@ -145,9 +124,9 @@ class MovieRepositoryImpl @Inject constructor(
     override fun getFavorites(): Flow<PagingData<Movie>> {
         return Pager(
             config = PagingConfig(
-                pageSize = FAVORITES_PAGE_SIZE,
+                pageSize = PagingDefaults.PAGE_SIZE,
                 enablePlaceholders = false,
-                prefetchDistance = PREFETCH_DISTANCE
+                prefetchDistance = PagingDefaults.PREFETCH_DISTANCE
             ),
             pagingSourceFactory = {
                 FavoritesPagingSource(
@@ -161,30 +140,13 @@ class MovieRepositoryImpl @Inject constructor(
         ).flow
     }
 
-    override fun isFavorite(movieId: Int): Flow<Boolean> {
-        return favoriteDao.isFavorite(movieId)
+    override fun observeIsFavorite(movieId: Int): Flow<Boolean> {
+        return favoriteDao.observeIsFavorite(movieId)
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    private fun Movie.toFavoriteEntity() = FavoriteEntity(
-        id = id,
-        title = title,
-        overview = overview,
-        posterPath = posterPath,
-        backdropPath = backdropPath,
-        releaseDate = releaseDate,
-        voteAverage = voteAverage,
-        voteCount = voteCount
-    )
+    override suspend fun isFavorite(movieId: Int) = favoriteDao.isFavorite(movieId)
 
     companion object {
-        /** Number of items loaded per page from the TMDB movie list endpoints. */
-        private const val PAGE_SIZE = 20
-
-        /** Items remaining before the end of the list that trigger a new page load. */
-        private const val PREFETCH_DISTANCE = 5
-
         /** Video hosting site identifier used to filter YouTube trailers. */
         private const val VIDEO_SITE_YOUTUBE = "YouTube"
 

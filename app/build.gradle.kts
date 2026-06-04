@@ -35,10 +35,6 @@ android {
         //   GET /authentication/token/new → authorize → POST /authentication/session/new
         buildConfigField("String", "TMDB_ACCOUNT_ID", "\"me\"")
         buildConfigField("String", "TMDB_SESSION_ID", "\"\"")
-        // The numeric ID of the TMDB list used as the favorites list for removal
-        // via POST /list/{list_id}/remove_item. Leave empty to fall back to the
-        // account-favorites toggle endpoint (POST /account/{account_id}/favorite).
-        buildConfigField("String", "TMDB_FAVORITES_LIST_ID", "\"\"")
     }
 
     buildTypes {

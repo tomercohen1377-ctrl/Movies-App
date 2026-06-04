@@ -3,6 +3,7 @@ package com.tcohen.moviesapp.di
 import android.content.Context
 import android.util.Log
 import coil.ImageLoader
+import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.tcohen.moviesapp.BuildConfig
@@ -14,7 +15,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
-import okhttp3.Cache
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -78,26 +78,17 @@ object NetworkModule {
     fun provideTmdbSessionId(): String = BuildConfig.TMDB_SESSION_ID
 
     /**
-     * Numeric TMDB list ID used for `POST /list/{list_id}/remove_item`.
-     * When empty, removal falls back to `POST /account/{account_id}/favorite` with `favorite=false`.
-     */
-    @Provides
-    @Singleton
-    @Named("tmdbFavoritesListId")
-    fun provideTmdbFavoritesListId(): String = BuildConfig.TMDB_FAVORITES_LIST_ID
-
-    /**
-     * Provides a Coil [ImageLoader] with proper 1-day image caching:
+     * Provides a Coil [ImageLoader] with persistent image caching:
      *
      * - Uses a **dedicated** [OkHttpClient] (separate from Retrofit's) so API JSON responses
-     *   are never accidentally cached through OkHttp — that is handled by Room.
-     * - Configures an OkHttp [Cache] (100 MB on disk). OkHttp respects the
-     *   `Cache-Control: max-age=86400` header added by the network interceptor, so images
-     *   are served from disk for up to 1 day before being re-fetched from TMDB's CDN.
+     *   are never accidentally cached — Room handles API data caching.
+     * - A network interceptor stamps every response with a 1-day `max-age`, so Coil treats
+     *   images as fresh for 24 hours before re-fetching from TMDB's CDN.
+     * - **Coil's own `DiskCache`** (100 MB) stores the raw image bytes on disk. Coil checks
+     *   the disk cache before making any network request, so cached images load instantly
+     *   offline as long as the entry is within the 7-day TTL.
      * - Memory cache holds the most-recently-used decoded bitmaps (25 % of available RAM)
-     *   for instant display without any disk I/O.
-     * - `diskCachePolicy = DISABLED` on the Coil level tells Coil to delegate all disk
-     *   caching to OkHttp, avoiding double-caching of the raw bytes.
+     *   for instant display without disk I/O during the current session.
      */
     @Provides
     @Singleton
@@ -105,39 +96,40 @@ object NetworkModule {
         @ApplicationContext context: Context,
         authInterceptor: AuthInterceptor
     ): ImageLoader {
-        val imageHttpCache = Cache(
-            directory = context.cacheDir.resolve("image_cache"),
-            maxSize = IMAGE_CACHE_MAX_SIZE_BYTES
-        )
-
         val imageOkHttpClient = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            // Network interceptor (runs only on live requests).
+            // Stamps every fresh response with a 1-day TTL so Coil's DiskCache keeps
+            // images for 24 hours before re-fetching from TMDB's CDN.
             .addNetworkInterceptor { chain ->
-                // Force a 1-day TTL on every image response so OkHttp's disk cache
-                // keeps the file for exactly 24 hours before re-validating with the CDN.
                 chain.proceed(chain.request()).newBuilder()
-                    .header(HEADER_CACHE_CONTROL, CACHE_CONTROL_ONE_DAY)
+                    .header(HEADER_CACHE_CONTROL, CACHE_CONTROL_IMAGES)
                     .build()
             }
-            .cache(imageHttpCache)
             .build()
 
         return ImageLoader.Builder(context)
             .okHttpClient(imageOkHttpClient)
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(IMAGE_CACHE_MAX_SIZE_BYTES)
+                    .build()
+            }
             .memoryCache {
                 MemoryCache.Builder(context)
                     .maxSizePercent(0.25)
                     .build()
             }
-            // No Coil-level disk cache — OkHttp's Cache (above) owns disk storage.
-            // This prevents the same bytes from being written to disk twice.
-            .diskCachePolicy(coil.request.CachePolicy.DISABLED)
             .crossfade(true)
             .build()
     }
 
     const val HEADER_CACHE_CONTROL = "Cache-Control"
-    const val CACHE_CONTROL_ONE_DAY = "max-age=86400, must-revalidate"
+
+    /** 1-day TTL for image responses (86 400 seconds = 60 × 60 × 24). */
+    const val CACHE_CONTROL_IMAGES = "max-age=86400"
+
     const val CONTENT_TYPE_JSON = "application/json"
     const val IMAGE_CACHE_MAX_SIZE_BYTES = 100L * 1024 * 1024
 
