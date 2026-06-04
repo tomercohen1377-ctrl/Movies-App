@@ -21,12 +21,32 @@ interface MovieRepository {
      */
     suspend fun getTrailer(movieId: Int): VideoResult?
 
-    /** Adds or removes a movie from the favorites list. */
+    /**
+     * Adds or removes a movie from the favorites list.
+     *
+     * Local Room is updated immediately (optimistic). If online and credentials
+     * are configured, the change is also pushed to the TMDB server:
+     * - **Add**: `POST /account/{account_id}/favorite` with `favorite = true`
+     * - **Remove**: `POST /list/{list_id}/remove_item` when a list ID is configured,
+     *   otherwise falls back to `POST /account/{account_id}/favorite` with `favorite = false`
+     */
     suspend fun toggleFavorite(movie: Movie)
 
-    /** Observes the full favorites list from local DB. */
-    fun getFavorites(): Flow<List<Movie>>
+    /**
+     * Returns a paginated [Flow] of the account's favorites.
+     *
+     * When online, each page is fetched from `GET /account/{account_id}/favorite/movies`
+     * and cached in Room. When offline, pages are served from the Room cache.
+     */
+    fun getFavorites(): Flow<PagingData<Movie>>
 
-    /** Observes whether a specific movie is currently favorited. */
+    /** Observes whether a specific movie is currently favorited (local, always fast). */
     fun isFavorite(movieId: Int): Flow<Boolean>
+
+    /**
+     * Emits [Unit] whenever a favorite is added or removed via [toggleFavorite].
+     * Used by the favorites ViewModel to restart the paging flow after any change,
+     * whether the change originated from the favorites screen or the detail screen.
+     */
+    val favoriteChanges: Flow<Unit>
 }

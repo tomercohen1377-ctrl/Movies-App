@@ -38,7 +38,7 @@ data class VideoResult(
 )
 
 enum class Category {
-    UPCOMING,
+    NOW_PLAYING,
     TOP_RATED,
-    NOW_PLAYING;
+    UPCOMING;
 }

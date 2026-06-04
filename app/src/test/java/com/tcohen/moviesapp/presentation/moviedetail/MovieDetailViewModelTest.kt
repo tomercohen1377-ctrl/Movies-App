@@ -72,7 +72,8 @@ class MovieDetailViewModelTest {
 
     @Test
     fun `load failure sets error and clears loading`() = runTest {
-        coEvery { repository.getMovieDetail(1) } throws RuntimeException("Network error")
+        // Use IOException to simulate a network failure — this maps to "No internet connection"
+        coEvery { repository.getMovieDetail(1) } throws java.io.IOException("connection refused")
         coEvery { repository.getTrailer(1) } returns null
         every { repository.isFavorite(1) } returns flowOf(false)
 
@@ -80,8 +81,30 @@ class MovieDetailViewModelTest {
 
         assertFalse(vm.state.value.isLoading)
         assertNotNull(vm.state.value.error)
-        assertEquals("Network error", vm.state.value.error)
+        assertEquals("No internet connection", vm.state.value.error)
         assertNull(vm.state.value.movie)
+    }
+
+    @Test
+    fun `unknown host exception shows no internet connection message`() = runTest {
+        coEvery { repository.getMovieDetail(1) } throws java.net.UnknownHostException("Unable to resolve host")
+        coEvery { repository.getTrailer(1) } returns null
+        every { repository.isFavorite(1) } returns flowOf(false)
+
+        val vm = createViewModel()
+
+        assertEquals("No internet connection", vm.state.value.error)
+    }
+
+    @Test
+    fun `generic exception shows fallback error message`() = runTest {
+        coEvery { repository.getMovieDetail(1) } throws RuntimeException("Internal error")
+        coEvery { repository.getTrailer(1) } returns null
+        every { repository.isFavorite(1) } returns flowOf(false)
+
+        val vm = createViewModel()
+
+        assertEquals("Failed to load movie details", vm.state.value.error)
     }
 
     @Test

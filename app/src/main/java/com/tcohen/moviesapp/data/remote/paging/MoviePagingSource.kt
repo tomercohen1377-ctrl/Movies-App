@@ -36,10 +36,17 @@ class MoviePagingSource(
                 Category.NOW_PLAYING -> apiService.getNowPlayingMovies(page)
             }
 
+            val now = System.currentTimeMillis()
             val movies = response.results.map { it.toDomain() }
 
-            // Cache to Room so offline browsing works later
-            movieDao.insertAll(movies.map { it.toEntity(category, page) })
+            // On the first page of a fresh online fetch, clear the stale cache so expired
+            // entries don't linger alongside the new data.
+            if (page == STARTING_PAGE_INDEX) {
+                movieDao.deleteByCategory(category.name)
+            }
+
+            // Cache to Room so offline browsing works later.
+            movieDao.insertAll(movies.map { it.toEntity(category, page, cachedAt = now) })
 
             LoadResult.Page(
                 data = movies,
@@ -52,6 +59,17 @@ class MoviePagingSource(
     }
 
     private suspend fun loadFromCache(page: Int): LoadResult<Int, Movie> {
+        // Refuse to serve data that is older than CACHE_EXPIRY_MS.
+        // getOldestCachedAt returns null when there is nothing cached yet.
+        val oldestCachedAt = movieDao.getOldestCachedAt(category.name) ?: 0L
+        val cacheAge = System.currentTimeMillis() - oldestCachedAt
+        if (cacheAge > CACHE_EXPIRY_MS) {
+            // Cache is expired (or never populated). Wipe stale rows and surface an error
+            // so Paging shows the "offline / retry" state rather than stale content.
+            movieDao.deleteByCategory(category.name)
+            return LoadResult.Error(NetworkUnavailableException())
+        }
+
         val cached = movieDao.getMoviesByCategory(category.name)
             .filter { it.page == page }
             .map { it.toDomain() }
@@ -77,10 +95,10 @@ class MoviePagingSource(
     }
 
     companion object {
-        /**
-         * Index of the first page when starting a fresh paging session.
-         * TMDB uses 1-based page numbers.
-         */
+        /** Index of the first page when starting a fresh paging session. TMDB uses 1-based page numbers. */
         const val STARTING_PAGE_INDEX = 1
+
+        /** Cached movie lists older than this are considered stale and will not be served offline. */
+        const val CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000L // 1 day
     }
 }

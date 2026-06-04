@@ -1,11 +1,14 @@
 package com.tcohen.moviesapp.presentation.moviedetail
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -35,16 +39,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import com.tcohen.moviesapp.domain.model.MovieDetail
 import com.tcohen.moviesapp.presentation.common.ErrorView
 import com.tcohen.moviesapp.presentation.common.MoviePosterImage
@@ -60,6 +68,15 @@ fun MovieDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    // Tracks whether the YouTube player has fired its onReady callback.
+    // Until it does (and we have a trailerKey), we keep the loading overlay visible.
+    var playerReady by remember { mutableStateOf(false) }
+
+    // Loading is "done" only once the API response is received AND the player is
+    // initialised (or there is no trailer to wait for).
+    val isFullyLoading = state.isLoading ||
+        (state.movie != null && state.trailerKey != null && !playerReady)
+
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -68,25 +85,39 @@ fun MovieDetailScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            state.isLoading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator()
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Render content as soon as movie data exists so the player can load in the
+        // background while the loading overlay is still shown on top.
+        if (state.movie != null) {
+            MovieDetailContent(
+                state = state,
+                onPlayerReady = { playerReady = true },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // Loading overlay — opaque, covers the content until everything is ready.
+        if (isFullyLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
             }
-            state.error != null -> {
-                ErrorView(
-                    message = state.error!!,
-                    onRetry = { viewModel.processIntent(MovieDetailIntent.Reload) }
-                )
-            }
-            state.movie != null -> {
-                MovieDetailContent(
-                    state = state,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+        }
+
+        // Error state
+        if (state.error != null) {
+            ErrorView(
+                message = state.error!!,
+                onRetry = { viewModel.processIntent(MovieDetailIntent.Reload) }
+            )
         }
 
         // Back button — overlaid on top-left, always visible
@@ -135,6 +166,7 @@ fun MovieDetailScreen(
 @Composable
 private fun MovieDetailContent(
     state: MovieDetailState,
+    onPlayerReady: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val movie = state.movie ?: return
@@ -142,11 +174,23 @@ private fun MovieDetailContent(
     Column(
         modifier = modifier.verticalScroll(rememberScrollState())
     ) {
-        // ── Trailer player at the very top (16:9) ──────────────────────────
-        TrailerPlayerSection(
-            trailerKey = state.trailerKey,
-            backdropUrl = TmdbImageUrl.backdrop(movie.backdropPath)
-        )
+        // ── Trailer player OR backdrop image at the very top ─────────────────
+        if (state.trailerKey != null) {
+            TrailerPlayerSection(
+                trailerKey = state.trailerKey,
+                onPlayerReady = onPlayerReady
+            )
+        } else {
+            AsyncImage(
+                model = TmdbImageUrl.backdrop(movie.backdropPath)
+                    ?: TmdbImageUrl.posterLarge(movie.posterPath),
+                contentDescription = movie.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp)
+            )
+        }
 
         // ── Movie metadata ─────────────────────────────────────────────────
         Column(modifier = Modifier.padding(16.dp)) {
@@ -217,7 +261,7 @@ private fun MovieDetailContent(
                 style = MaterialTheme.typography.bodyMedium
             )
 
-            // Bottom padding so the FAB doesn't overlap the last line
+            // Bottom spacer so the FAB doesn't cover the last line
             Spacer(modifier = Modifier.height(88.dp))
         }
     }

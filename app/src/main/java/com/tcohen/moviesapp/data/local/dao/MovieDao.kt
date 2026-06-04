@@ -20,4 +20,8 @@ interface MovieDao {
 
     @Query("SELECT MAX(page) FROM movies WHERE category = :category")
     suspend fun getLastCachedPage(category: String): Int?
+
+    /** Returns the oldest fetch timestamp for a category, used to check if the cache has expired. */
+    @Query("SELECT MIN(cachedAt) FROM movies WHERE category = :category")
+    suspend fun getOldestCachedAt(category: String): Long?
 }

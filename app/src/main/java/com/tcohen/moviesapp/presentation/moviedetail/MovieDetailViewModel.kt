@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tcohen.moviesapp.data.mapper.toMovie
 import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.presentation.navigation.Screen
+import com.tcohen.moviesapp.util.NetworkUnavailableException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.net.UnknownHostException
+import java.net.SocketTimeoutException
+import java.io.IOException
 import javax.inject.Inject
 
 @HiltViewModel
@@ -71,7 +75,7 @@ class MovieDetailViewModel @Inject constructor(
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        error = e.message ?: "Failed to load movie details"
+                        error = e.toUserMessage()
                     )
                 }
             }
@@ -98,4 +102,18 @@ class MovieDetailViewModel @Inject constructor(
             _effects.send(MovieDetailEffect.NavigateBack)
         }
     }
+}
+
+/**
+ * Maps a network or generic [Exception] to a short, user-friendly error string.
+ *
+ * Raw exception messages (e.g. "Unable to resolve host 'api.themoviedb.org'…") are
+ * replaced with plain language that makes sense to end-users.
+ */
+private fun Exception.toUserMessage(): String = when (this) {
+    is NetworkUnavailableException -> "No internet connection"
+    is UnknownHostException        -> "No internet connection"
+    is SocketTimeoutException      -> "Connection timed out — check your internet and retry"
+    is IOException                 -> "No internet connection"
+    else                           -> "Failed to load movie details"
 }

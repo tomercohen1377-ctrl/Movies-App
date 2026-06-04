@@ -86,7 +86,7 @@ fun MovieDetail.toMovie(): Movie = Movie(
     voteCount = voteCount
 )
 
-fun Movie.toEntity(category: Category, page: Int): MovieEntity = MovieEntity(
+fun Movie.toEntity(category: Category, page: Int, cachedAt: Long = System.currentTimeMillis()): MovieEntity = MovieEntity(
     id = id,
     title = title,
     overview = overview,
@@ -96,5 +96,6 @@ fun Movie.toEntity(category: Category, page: Int): MovieEntity = MovieEntity(
     voteAverage = voteAverage,
     voteCount = voteCount,
     category = category.name,
-    page = page
+    page = page,
+    cachedAt = cachedAt
 )

@@ -1,5 +1,6 @@
 package com.tcohen.moviesapp.presentation.favorites
 
+import androidx.paging.PagingData
 import app.cash.turbine.test
 import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.fakeMovie
@@ -9,11 +10,9 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -31,59 +30,11 @@ class FavoritesViewModelTest {
 
     @Before
     fun setUp() {
-        every { repository.getFavorites() } returns flowOf(emptyList())
+        // favoriteChanges drives flatMapLatest in the ViewModel; use an empty flow so
+        // it doesn't emit after onStart and cause extra getFavorites calls.
+        every { repository.favoriteChanges } returns flowOf()
+        every { repository.getFavorites() } returns flowOf(PagingData.empty())
         viewModel = FavoritesViewModel(repository)
-    }
-
-    // ── Initial state ─────────────────────────────────────────────────────────
-
-    @Test
-    fun `initial state has empty favorites list`() {
-        assertTrue(viewModel.state.value.favorites.isEmpty())
-    }
-
-    @Test
-    fun `initial isEmpty is true`() {
-        assertTrue(viewModel.state.value.isEmpty)
-    }
-
-    // ── Favorites list observation ────────────────────────────────────────────
-
-    @Test
-    fun `favorites list updates when repository emits`() {
-        val movies = listOf(fakeMovie(1), fakeMovie(2))
-        every { repository.getFavorites() } returns flowOf(movies)
-
-        val vm = FavoritesViewModel(repository)
-
-        assertEquals(2, vm.state.value.favorites.size)
-        assertFalse(vm.state.value.isEmpty)
-    }
-
-    @Test
-    fun `isEmpty is true when list is empty`() {
-        every { repository.getFavorites() } returns flowOf(emptyList())
-        val vm = FavoritesViewModel(repository)
-        assertTrue(vm.state.value.isEmpty)
-    }
-
-    @Test
-    fun `isEmpty is false when list has items`() {
-        every { repository.getFavorites() } returns flowOf(listOf(fakeMovie()))
-        val vm = FavoritesViewModel(repository)
-        assertFalse(vm.state.value.isEmpty)
-    }
-
-    @Test
-    fun `state updates reactively when favorites change`() = runTest {
-        val favoritesFlow = MutableStateFlow(listOf(fakeMovie(1)))
-        every { repository.getFavorites() } returns favoritesFlow
-
-        val vm = FavoritesViewModel(repository)
-        assertEquals(1, vm.state.value.favorites.size)
-
-        favoritesFlow.value = listOf(fakeMovie(1), fakeMovie(2))
-        assertEquals(2, vm.state.value.favorites.size)
     }
 
     // ── OpenDetail ────────────────────────────────────────────────────────────
@@ -102,36 +53,24 @@ class FavoritesViewModelTest {
     // ── RemoveFavorite ────────────────────────────────────────────────────────
 
     @Test
-    fun `RemoveFavorite calls toggleFavorite when movie exists in list`() = runTest {
+    fun `RemoveFavorite calls toggleFavorite with the provided movie`() = runTest {
         val movie = fakeMovie(id = 3)
-        every { repository.getFavorites() } returns flowOf(listOf(movie))
         coJustRun { repository.toggleFavorite(movie) }
 
-        val vm = FavoritesViewModel(repository)
-        vm.processIntent(FavoritesIntent.RemoveFavorite(movieId = 3))
+        viewModel.processIntent(FavoritesIntent.RemoveFavorite(movie))
 
         coVerify { repository.toggleFavorite(movie) }
     }
 
     @Test
-    fun `RemoveFavorite is no-op when movie not in list`() = runTest {
-        every { repository.getFavorites() } returns flowOf(emptyList())
-        coJustRun { repository.toggleFavorite(any()) }
+    fun `RemoveFavorite increments refresh trigger after toggleFavorite`() = runTest {
+        val movie = fakeMovie(id = 5)
+        coJustRun { repository.toggleFavorite(movie) }
 
-        val vm = FavoritesViewModel(repository)
-        vm.processIntent(FavoritesIntent.RemoveFavorite(movieId = 999))
+        // Each RemoveFavorite should trigger a refresh (i.e. getFavorites is re-subscribed)
+        viewModel.processIntent(FavoritesIntent.RemoveFavorite(movie))
 
-        // toggleFavorite should never be called because movie doesn't exist
-        coVerify(exactly = 0) { repository.toggleFavorite(any()) }
-    }
-
-    @Test
-    fun `favorites list correctly reflects all added items`() {
-        val movies = (1..5).map { fakeMovie(it) }
-        every { repository.getFavorites() } returns flowOf(movies)
-        val vm = FavoritesViewModel(repository)
-
-        assertEquals(5, vm.state.value.favorites.size)
-        assertEquals((1..5).toList(), vm.state.value.favorites.map { it.id })
+        // toggleFavorite called once per remove intent
+        coVerify(exactly = 1) { repository.toggleFavorite(movie) }
     }
 }

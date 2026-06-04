@@ -26,6 +26,19 @@ android {
         buildConfigField("String", "TMDB_READ_ACCESS_TOKEN", "\"eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiMzU1NDQ2MzgwZDAwOTY5OWE3ZjNkMzg2MzA5NTI4YyIsIm5iZiI6MTc4MDQ3NjMwNS4wODYwMDAyLCJzdWIiOiI2YTFmZTk5MWMxYjZkMzYwM2I2NzYwNWYiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.x_nDchzUfxvVQ7ww2njVgOzst7zhJuCD186CMfP_7gc\"")
         buildConfigField("String", "TMDB_BASE_URL", "\"https://api.themoviedb.org/3/\"")
         buildConfigField("String", "TMDB_IMAGE_BASE_URL", "\"https://image.tmdb.org/t/p/\"")
+
+        // TMDB account credentials for favorites server sync.
+        // TMDB_ACCOUNT_ID: use "me" (works with v4 Bearer read token for GET)
+        //   or replace with your numeric TMDB account ID for v3 session auth.
+        // TMDB_SESSION_ID: required for write operations (add/remove favorite).
+        //   Obtain via the TMDB v3 authentication flow:
+        //   GET /authentication/token/new → authorize → POST /authentication/session/new
+        buildConfigField("String", "TMDB_ACCOUNT_ID", "\"me\"")
+        buildConfigField("String", "TMDB_SESSION_ID", "\"\"")
+        // The numeric ID of the TMDB list used as the favorites list for removal
+        // via POST /list/{list_id}/remove_item. Leave empty to fall back to the
+        // account-favorites toggle endpoint (POST /account/{account_id}/favorite).
+        buildConfigField("String", "TMDB_FAVORITES_LIST_ID", "\"\"")
     }
 
     buildTypes {
@@ -97,6 +110,9 @@ dependencies {
     // Media3 (embedded trailer player)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
+
+    // YouTube Player (trailer embedding)
+    implementation(libs.youtube.player)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)

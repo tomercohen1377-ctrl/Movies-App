@@ -1,11 +1,13 @@
 package com.tcohen.moviesapp.presentation.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,12 +19,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,14 +34,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemKey
 import com.tcohen.moviesapp.presentation.common.CategoryFilterRow
 import com.tcohen.moviesapp.presentation.common.ErrorView
 import com.tcohen.moviesapp.presentation.common.MovieCard
 import com.tcohen.moviesapp.presentation.common.NetworkErrorFooter
-import com.tcohen.moviesapp.presentation.common.ShimmerEffect
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToDetail: (Int) -> Unit,
@@ -60,8 +57,6 @@ fun HomeScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-
-        TopAppBar(title = { Text("Movies") })
 
         // Offline banner — shown only when device has no connectivity
         AnimatedVisibility(visible = state.isOffline) {
@@ -119,7 +114,10 @@ fun HomeScreen(
                 ) {
                     items(
                         count = movies.itemCount,
-                        key = movies.itemKey { it.id }
+                        // No custom key — falls back to index-based keys from Paging 3.
+                        // Using movie.id as the key caused a crash because TMDB can return
+                        // the same movie on two different pages (items shift between requests),
+                        // producing a duplicate key in LazyVerticalGrid.
                     ) { index ->
                         val movie = movies[index]
                         if (movie != null) {
@@ -130,18 +128,21 @@ fun HomeScreen(
                                 }
                             )
                         } else {
-                            // Placeholder while the page loads
-                            ShimmerEffect(
+                            // Lightweight colour placeholder while the page loads.
+                            // Avoids running continuous shimmer animations on 20+ cells simultaneously.
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .aspectRatio(2f / 3f)
                                     .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                             )
                         }
                     }
 
                     // Footer: spinner while loading next page, or error if offline boundary hit
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        when (val appendState = movies.loadState.append) {
+                        when (movies.loadState.append) {
                             is LoadState.Loading -> {
                                 Box(
                                     modifier = Modifier

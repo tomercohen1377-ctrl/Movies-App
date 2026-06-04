@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base application theme. Compose Material 3 handles theming at runtime;
-         this XML theme is only required for the window background and activity launch. -->
+    <!--
+        Base application theme.
+        - android:windowBackground is explicitly white so there is no black flash during
+          navigation transitions (without this, some devices/API levels show a black
+          window-background frame while Compose paints the first composition frame).
+        - Status/nav bar colours are transparent so enableEdgeToEdge() in MainActivity
+          can manage them at runtime.
+        - Compose Material 3 (MoviesAppTheme) handles all in-app theming; this XML
+          theme is only needed for the window chrome and activity launch.
+    -->
     <style name="Theme.MoviesApp" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>

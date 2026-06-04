@@ -4,7 +4,6 @@ import com.tcohen.moviesapp.data.local.dao.FavoriteDao
 import com.tcohen.moviesapp.data.local.dao.MovieDao
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
 import com.tcohen.moviesapp.data.remote.dto.VideoDto
-import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.fakeFavoriteEntity
 import com.tcohen.moviesapp.fakeMovie
@@ -17,9 +16,10 @@ import io.mockk.coJustRun
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import androidx.paging.testing.asSnapshot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -36,10 +36,14 @@ class MovieRepositoryImplTest {
     private val apiService: TmdbApiService = mockk()
     private val movieDao: MovieDao = mockk()
     private val favoriteDao: FavoriteDao = mockk()
-    private val networkMonitor: NetworkMonitor = mockk()
-
+    private val networkMonitor: NetworkMonitor = mockk {
+        every { isCurrentlyOnline() } returns false   // server sync path disabled in unit tests
+    }
     private val repository: MovieRepositoryImpl by lazy {
-        MovieRepositoryImpl(apiService, movieDao, favoriteDao, networkMonitor)
+        MovieRepositoryImpl(
+            apiService, movieDao, favoriteDao, networkMonitor,
+            accountId = "", sessionId = "", favoritesListId = ""
+        )
     }
 
     // ── getMovieDetail ────────────────────────────────────────────────────────
@@ -63,7 +67,7 @@ class MovieRepositoryImplTest {
         var threw = false
         try {
             repository.getMovieDetail(999)
-        } catch (e: RuntimeException) {
+        } catch (_: RuntimeException) {
             threw = true
         }
         assert(threw)
@@ -168,27 +172,32 @@ class MovieRepositoryImplTest {
         coVerify { favoriteDao.deleteById(4) }
     }
 
-    // ── getFavorites ──────────────────────────────────────────────────────────
+    // ── getFavorites (paging) ─────────────────────────────────────────────────
 
     @Test
-    fun `getFavorites returns mapped list from DAO`() = runTest {
+    fun `getFavorites returns paged items from Room when offline`() = runTest {
+        // networkMonitor already returns false (offline) in this test class.
         val entities = listOf(fakeFavoriteEntity(1), fakeFavoriteEntity(2))
-        every { favoriteDao.observeAll() } returns flowOf(entities)
+        // FavoritesPagingSource fetches FAVORITES_PAGE_SIZE + 1 rows to detect next page.
+        coEvery { favoriteDao.getFavoritesPaged(any(), 0) } returns entities
+        coEvery { favoriteDao.getFavoritesPaged(any(), 20) } returns emptyList()
 
-        val result = repository.getFavorites().first()
+        val snapshot = repository.getFavorites()
+            .asSnapshot()
 
-        assertEquals(2, result.size)
-        assertEquals(1, result[0].id)
-        assertEquals(2, result[1].id)
+        assertEquals(2, snapshot.size)
+        assertEquals(1, snapshot[0].id)
+        assertEquals(2, snapshot[1].id)
     }
 
     @Test
-    fun `getFavorites returns empty list when no favorites`() = runTest {
-        every { favoriteDao.observeAll() } returns flowOf(emptyList())
+    fun `getFavorites returns empty snapshot when no cached favorites`() = runTest {
+        coEvery { favoriteDao.getFavoritesPaged(any(), any()) } returns emptyList()
 
-        val result = repository.getFavorites().first()
+        val snapshot = repository.getFavorites()
+            .asSnapshot()
 
-        assertEquals(emptyList<Movie>(), result)
+        assertEquals(emptyList<Movie>(), snapshot)
     }
 
     // ── isFavorite ────────────────────────────────────────────────────────────
