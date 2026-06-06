@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -60,7 +62,9 @@ fun MovieCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier.aspectRatio(MovieCardDefaults.ASPECT_RATIO),
+        modifier = modifier
+            .aspectRatio(MovieCardDefaults.ASPECT_RATIO)
+            .semantics { testTag = "movie_card" },
         shape = RoundedCornerShape(MovieCardDefaults.CORNER_RADIUS),
         elevation = CardDefaults.cardElevation(defaultElevation = MovieCardDefaults.ELEVATION)
     ) {

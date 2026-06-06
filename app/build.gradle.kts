@@ -18,7 +18,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.tcohen.moviesapp.HiltTestRunner"
 
         // TMDB credentials — committed so anyone who clones the repo can run the app.
         // Both are public read-only and scoped only to TMDB data reads.
@@ -137,4 +137,8 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+
+    // Hilt for full-app journey tests (ActivityScenario + real DI with fakes)
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.android.compiler)
 }
