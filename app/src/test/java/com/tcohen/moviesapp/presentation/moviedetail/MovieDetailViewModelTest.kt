@@ -53,6 +53,7 @@ class MovieDetailViewModelTest {
         val trailer = fakeVideoResult("abc123")
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Success(detail)
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(trailer)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -67,6 +68,7 @@ class MovieDetailViewModelTest {
     fun `successful load with null trailer produces Success with null trailerKey`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Success(fakeMovieDetail())
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -78,6 +80,7 @@ class MovieDetailViewModelTest {
     fun `trailer error is treated as no trailer (graceful degradation)`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Success(fakeMovieDetail())
         coEvery { repository.getTrailer(1) } returns NetworkResult.Error("Service temporarily unavailable.", 503)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -93,6 +96,7 @@ class MovieDetailViewModelTest {
     fun `network error produces Error state with no-internet message`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Error(ApiError.NO_CONNECTION.message)
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -106,6 +110,7 @@ class MovieDetailViewModelTest {
     fun `401 HTTP error produces Error state with server message`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Error("Invalid API key.", 401)
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -117,6 +122,7 @@ class MovieDetailViewModelTest {
     fun `404 HTTP error produces Error state with not-found message`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Error("The resource you requested could not be found.", 404)
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -128,6 +134,7 @@ class MovieDetailViewModelTest {
     fun `500 HTTP error produces Error state`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Error("Internal error: Something went wrong.", 500)
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -139,6 +146,7 @@ class MovieDetailViewModelTest {
     fun `unexpected error produces Error state with fallback message`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Error(ApiError.UNEXPECTED.message)
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -160,6 +168,7 @@ class MovieDetailViewModelTest {
         val detail = fakeMovieDetail()
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Success(detail)
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -175,6 +184,7 @@ class MovieDetailViewModelTest {
     fun `ToggleFavorite calls repository when in Success state`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Success(fakeMovieDetail())
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
         coJustRun { repository.toggleFavorite(any()) }
 
@@ -188,6 +198,7 @@ class MovieDetailViewModelTest {
     fun `isFavorite = true is reflected in Success state`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Success(fakeMovieDetail())
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns true
         every { repository.observeIsFavorite(1) } returns flowOf(true)
 
         val vm = createViewModel()
@@ -199,6 +210,7 @@ class MovieDetailViewModelTest {
     fun `isFavorite = false is reflected in Success state`() = runTest {
         coEvery { repository.getMovieDetail(1) } returns NetworkResult.Success(fakeMovieDetail())
         coEvery { repository.getTrailer(1) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
         val vm = createViewModel()
@@ -213,6 +225,7 @@ class MovieDetailViewModelTest {
         val detail = fakeMovieDetail(id = 5)
         coEvery { repository.getMovieDetail(5) } returns NetworkResult.Success(detail)
         coEvery { repository.getTrailer(5) } returns NetworkResult.Success(null)
+        coEvery { repository.isFavorite(5) } returns false
         every { repository.observeIsFavorite(5) } returns flowOf(false)
 
         val vm = createViewModel(movieId = 5)

@@ -60,6 +60,14 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // Allow Android framework classes (e.g. android.util.Log) to return default
+            // values in unit tests instead of throwing "not mocked" RuntimeException.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

@@ -62,6 +62,8 @@ class MovieRepositoryImpl @Inject constructor(
         safeApiCall { apiService.getMovieDetails(movieId).toDomain() }
 
     override suspend fun getTrailer(movieId: Int): NetworkResult<VideoResult?> {
+        // Offline fast-path — no point attempting a network call with no connectivity.
+        if (!networkMonitor.isCurrentlyOnline()) return NetworkResult.Success(null)
         return safeApiCall {
             apiService.getMovieVideos(movieId).results
                 .filter { it.site == VIDEO_SITE_YOUTUBE && it.type == VIDEO_TYPE_TRAILER }
