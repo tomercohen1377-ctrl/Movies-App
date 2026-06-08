@@ -10,6 +10,7 @@ A production-quality Android application that browses movies using [The Movie Da
   <img src="assets/home.png" width="300" />
   <img src="assets/details.png" width="300" />
   <img src="assets/favorites.png" width="300" />
+  <img src="assets/offline.png" width="300" />
 </p>
 
 ---
