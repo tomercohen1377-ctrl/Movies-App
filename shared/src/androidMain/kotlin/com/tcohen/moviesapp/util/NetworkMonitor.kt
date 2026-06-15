@@ -9,15 +9,15 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import javax.inject.Inject
-
 /**
  * Android implementation of [NetworkStatusProvider].
  *
  * - [isOnline] — cold flow emitting true/false on connectivity changes.
  * - [isCurrentlyOnline] — synchronous snapshot for non-coroutine contexts (e.g. PagingSource).
+ *
+ * Constructed and provided by Koin (see androidSharedModule).
  */
-class NetworkMonitor @Inject constructor(private val context: Context) : NetworkStatusProvider {
+class NetworkMonitor(private val context: Context) : NetworkStatusProvider {
 
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

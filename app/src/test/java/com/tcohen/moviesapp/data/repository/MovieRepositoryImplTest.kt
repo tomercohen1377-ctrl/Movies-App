@@ -9,8 +9,8 @@ import com.tcohen.moviesapp.fakeMovie
 import com.tcohen.moviesapp.fakeMovieDetailDto
 import com.tcohen.moviesapp.fakeVideoListResponse
 import com.tcohen.moviesapp.util.MainDispatcherRule
-import com.tcohen.moviesapp.util.NetworkMonitor
 import com.tcohen.moviesapp.util.NetworkResult
+import com.tcohen.moviesapp.util.NetworkStatusProvider
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -35,11 +35,11 @@ class MovieRepositoryImplTest {
 
     private val remoteDataSource: TmdbRemoteDataSource = mockk()
     private val localDataSource: LocalMovieDataSource = mockk()
-    private val networkMonitor: NetworkMonitor = mockk {
+    private val networkStatusProvider: NetworkStatusProvider = mockk {
         every { isCurrentlyOnline() } returns false   // server sync path disabled in unit tests
     }
     private val repository: MovieRepositoryImpl by lazy {
-        MovieRepositoryImpl(remoteDataSource, localDataSource, networkMonitor)
+        MovieRepositoryImpl(remoteDataSource, localDataSource, networkStatusProvider)
     }
 
     // ── getMovieDetail ────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getTrailer returns Success with YouTube trailer key when online`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getMovieVideos(1) } returns fakeVideoListResponse(trailerKey = "abc123")
 
         val result = repository.getTrailer(1) as NetworkResult.Success
@@ -80,7 +80,7 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getTrailer returns Success with null when offline`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
 
         val result = repository.getTrailer(1) as NetworkResult.Success
 
@@ -89,7 +89,7 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getTrailer returns Success with null when no YouTube trailers exist`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getMovieVideos(1) } returns fakeVideoListResponse(trailerKey = null)
 
         val result = repository.getTrailer(1) as NetworkResult.Success
@@ -99,7 +99,7 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getTrailer prefers official trailers over unofficial`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         val response = fakeVideoListResponse().copy(
             results = listOf(
                 VideoResponse(
@@ -123,7 +123,7 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getTrailer ignores non-YouTube sources`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         val response = fakeVideoListResponse().copy(
             results = listOf(
                 VideoResponse(

@@ -1,8 +1,8 @@
 [versions]
 # Build tools
 agp = "8.7.0"
-kotlin = "2.0.21"
-ksp = "2.0.21-1.0.28"
+kotlin = "2.1.20"
+ksp = "2.1.20-1.0.31"
 
 # Core
 coreKtx = "1.15.0"
@@ -13,9 +13,8 @@ activityCompose = "1.9.3"
 composeBom = "2024.11.00"
 navigationCompose = "2.8.4"
 
-# DI
-hilt = "2.52"
-hiltNavigationCompose = "1.2.0"
+# DI — Koin (KMP-compatible)
+koin = "4.0.0"
 
 # Network
 retrofit = "2.11.0"
@@ -24,7 +23,7 @@ kotlinxSerializationJson = "1.7.3"
 retrofitKotlinxSerialization = "1.0.0"
 
 # Compose Multiplatform
-composeMultiplatform = "1.7.0"
+composeMultiplatform = "1.7.3"
 
 # Image — Coil 3 (KMP-compatible)
 coil = "2.7.0"
@@ -48,6 +47,15 @@ ktor = "2.3.12"
 
 # SQLDelight
 sqldelight = "2.0.2"
+
+# CashApp Multiplatform Paging (KMP wrapper for AndroidX paging)
+cashappPaging = "3.3.0-alpha02-0.5.1"
+
+# JetBrains AndroidX KMP lifecycle (ViewModel in commonMain)
+jetbrainsLifecycle = "2.8.4"
+
+# JetBrains AndroidX KMP navigation (navigation-compose in commonMain)
+jetbrainsNavigation = "2.8.0-alpha10"
 
 # Testing
 junit = "4.13.2"
@@ -77,10 +85,10 @@ androidx-material-icons-extended = { group = "androidx.compose.material", name =
 # Navigation
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
-# Hilt
-hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
-hilt-android-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
-androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+# Koin DI
+koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
+koin-android = { group = "io.insert-koin", name = "koin-android", version.ref = "koin" }
+koin-compose-viewmodel = { group = "io.insert-koin", name = "koin-compose-viewmodel", version.ref = "koin" }
 
 # Network
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
@@ -94,6 +102,7 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 # Image — Coil 3 (KMP)
 coil3-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil3" }
 coil3-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil3" }
+coil3-network-ktor = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", version.ref = "coil3" }
 
 # Room
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
@@ -115,15 +124,28 @@ youtube-player = { group = "com.pierfrancescosoffritti.androidyoutubeplayer", na
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
+# CashApp Multiplatform Paging
+cashapp-paging-common = { group = "app.cash.paging", name = "paging-common", version.ref = "cashappPaging" }
+cashapp-paging-compose-common = { group = "app.cash.paging", name = "paging-compose-common", version.ref = "cashappPaging" }
+
+# JetBrains lifecycle KMP
+jetbrains-lifecycle-viewmodel = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "jetbrainsLifecycle" }
+jetbrains-lifecycle-viewmodel-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "jetbrainsLifecycle" }
+
+# JetBrains navigation KMP
+jetbrains-navigation-compose = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref = "jetbrainsNavigation" }
+
 # SQLDelight
 sqldelight-android-driver = { group = "app.cash.sqldelight", name = "android-driver", version.ref = "sqldelight" }
 sqldelight-native-driver = { group = "app.cash.sqldelight", name = "native-driver", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { group = "app.cash.sqldelight", name = "sqlite-driver", version.ref = "sqldelight" }
 sqldelight-coroutines-extensions = { group = "app.cash.sqldelight", name = "coroutines-extensions", version.ref = "sqldelight" }
 
 # Ktor
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-darwin = { group = "io.ktor", name = "ktor-client-darwin", version.ref = "ktor" }
+ktor-client-java = { group = "io.ktor", name = "ktor-client-java", version.ref = "ktor" }
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
@@ -138,7 +160,7 @@ mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 androidx-paging-testing = { group = "androidx.paging", name = "paging-testing", version.ref = "paging" }
-hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "hilt" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -147,7 +169,6 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

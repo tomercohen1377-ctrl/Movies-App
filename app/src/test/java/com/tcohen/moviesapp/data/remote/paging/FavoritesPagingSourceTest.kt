@@ -8,7 +8,7 @@ import com.tcohen.moviesapp.data.remote.TmdbRemoteDataSource
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.fakeMovie
 import com.tcohen.moviesapp.fakeMovieListResponse
-import com.tcohen.moviesapp.util.NetworkMonitor
+import com.tcohen.moviesapp.util.NetworkStatusProvider
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -22,21 +22,21 @@ class FavoritesPagingSourceTest {
 
     private val remoteDataSource: TmdbRemoteDataSource = mockk()
     private val localDataSource: LocalMovieDataSource = mockk()
-    private val networkMonitor: NetworkMonitor = mockk()
+    private val networkStatusProvider: NetworkStatusProvider = mockk()
 
     private val pagingConfig = PagingConfig(pageSize = 20, enablePlaceholders = false)
 
     private fun createSource() = FavoritesPagingSource(
-        remoteDataSource = remoteDataSource,
-        localDataSource  = localDataSource,
-        networkMonitor   = networkMonitor
+        remoteDataSource      = remoteDataSource,
+        localDataSource       = localDataSource,
+        networkStatusProvider = networkStatusProvider
     )
 
     // ── Online path ───────────────────────────────────────────────────────────
 
     @Test
     fun `online - first page has null prevKey`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getFavoriteMovies(1) } returns
             fakeMovieListResponse(page = 1, totalPages = 3)
 
@@ -48,7 +48,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `online - first page has correct nextKey when more pages exist`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getFavoriteMovies(1) } returns
             fakeMovieListResponse(page = 1, totalPages = 3)
 
@@ -60,7 +60,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `online - last page has null nextKey`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getFavoriteMovies(2) } returns
             fakeMovieListResponse(page = 2, totalPages = 2)
 
@@ -74,7 +74,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `online - movies are returned from response`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getFavoriteMovies(1) } returns
             fakeMovieListResponse(page = 1, totalPages = 1, count = 5)
 
@@ -86,7 +86,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `online - API error returns LoadResult Error`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getFavoriteMovies(any()) } throws
             RuntimeException("Network failure")
 
@@ -102,7 +102,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `offline - returns cached favorites from SQLDelight`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
         val movies = (1..5).map { fakeMovie(id = it) }
         coEvery { localDataSource.getFavoritesPaged(limit = 21, offset = 0) } returns movies
 
@@ -116,7 +116,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `offline - first page has null prevKey`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
         coEvery { localDataSource.getFavoritesPaged(limit = 21, offset = 0) } returns
             (1..5).map { fakeMovie(id = it) }
 
@@ -130,7 +130,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `offline - has nextKey when more than PAGE_SIZE items returned`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
         val movies = (1..21).map { fakeMovie(id = it) }
         coEvery { localDataSource.getFavoritesPaged(limit = 21, offset = 0) } returns movies
 
@@ -145,7 +145,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `offline - no favorites returns empty page with null nextKey`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
         coEvery { localDataSource.getFavoritesPaged(limit = 21, offset = 0) } returns emptyList()
 
         val source = createSource()
@@ -159,7 +159,7 @@ class FavoritesPagingSourceTest {
 
     @Test
     fun `offline - correct offset used for page 2`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
         coEvery { localDataSource.getFavoritesPaged(limit = 21, offset = 20) } returns
             (1..3).map { fakeMovie(id = it) }
 

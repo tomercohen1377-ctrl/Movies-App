@@ -1,7 +1,7 @@
 package com.tcohen.moviesapp.presentation.moviedetail
 
 import com.tcohen.moviesapp.data.mapper.toMovie
-import com.tcohen.moviesapp.domain.repository.MovieRepositoryBase
+import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.util.NetworkResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
  */
 class MovieDetailStateHolder(
     private val movieId: Int?,
-    private val repository: MovieRepositoryBase,
+    private val repository: MovieRepository,
     private val scope: CoroutineScope
 ) {
 

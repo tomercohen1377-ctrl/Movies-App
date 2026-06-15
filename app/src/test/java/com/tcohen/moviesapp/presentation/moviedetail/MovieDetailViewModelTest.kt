@@ -1,6 +1,6 @@
 package com.tcohen.moviesapp.presentation.moviedetail
 
-import com.tcohen.moviesapp.domain.repository.MovieRepositoryBase
+import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.fakeMovieDetail
 import com.tcohen.moviesapp.fakeVideoResult
 import com.tcohen.moviesapp.util.ApiError
@@ -36,7 +36,7 @@ class MovieDetailViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val repository: MovieRepositoryBase = mockk()
+    private val repository: MovieRepository = mockk()
 
     private fun createStateHolder(movieId: Int? = 1): MovieDetailStateHolder =
         MovieDetailStateHolder(

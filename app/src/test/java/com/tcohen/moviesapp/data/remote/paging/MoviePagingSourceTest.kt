@@ -9,7 +9,7 @@ import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.fakeMovie
 import com.tcohen.moviesapp.fakeMovieListResponse
-import com.tcohen.moviesapp.util.NetworkMonitor
+import com.tcohen.moviesapp.util.NetworkStatusProvider
 import com.tcohen.moviesapp.util.NetworkUnavailableException
 import io.mockk.coEvery
 import io.mockk.coJustRun
@@ -27,7 +27,7 @@ class MoviePagingSourceTest {
 
     private val remoteDataSource: TmdbRemoteDataSource = mockk()
     private val localDataSource: LocalMovieDataSource = mockk()
-    private val networkMonitor: NetworkMonitor = mockk()
+    private val networkStatusProvider: NetworkStatusProvider = mockk()
 
     private val pagingConfig = PagingConfig(pageSize = 20, enablePlaceholders = false)
 
@@ -38,13 +38,13 @@ class MoviePagingSourceTest {
     }
 
     private fun createSource(category: Category = Category.UPCOMING) =
-        MoviePagingSource(remoteDataSource, localDataSource, category, networkMonitor)
+        MoviePagingSource(remoteDataSource, localDataSource, category, networkStatusProvider)
 
     // ── Online path ───────────────────────────────────────────────────────────
 
     @Test
     fun `online - first page loaded with correct nextKey`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getUpcomingMovies(1) } returns fakeMovieListResponse(page = 1, totalPages = 5)
 
         val pager = TestPager(pagingConfig, createSource())
@@ -57,7 +57,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `online - last page has null nextKey`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getUpcomingMovies(3) } returns fakeMovieListResponse(page = 3, totalPages = 3)
 
         val source = createSource()
@@ -71,7 +71,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `online - correct API called for TOP_RATED category`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getTopRatedMovies(1) } returns fakeMovieListResponse()
 
         val pager = TestPager(pagingConfig, createSource(Category.TOP_RATED))
@@ -82,7 +82,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `online - correct API called for NOW_PLAYING category`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getNowPlayingMovies(1) } returns fakeMovieListResponse()
 
         val pager = TestPager(pagingConfig, createSource(Category.NOW_PLAYING))
@@ -93,7 +93,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `online - movies are cached to SQLDelight after network load`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getUpcomingMovies(1) } returns fakeMovieListResponse()
 
         val pager = TestPager(pagingConfig, createSource())
@@ -104,7 +104,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `online - page 1 deletes stale cache before inserting`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getUpcomingMovies(1) } returns fakeMovieListResponse()
 
         val pager = TestPager(pagingConfig, createSource())
@@ -115,7 +115,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `online - API error returns LoadResult Error`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns true
+        every { networkStatusProvider.isCurrentlyOnline() } returns true
         coEvery { remoteDataSource.getUpcomingMovies(1) } throws RuntimeException("HTTP 500")
 
         val source = createSource()
@@ -130,7 +130,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `offline - returns cached data from SQLDelight`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
         val cachedMovies = (1..5).map { fakeMovie(id = it) }
         coEvery { localDataSource.getMoviesByCategory(Category.UPCOMING.name) } returns cachedMovies
 
@@ -145,7 +145,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `offline - no cached data returns NetworkUnavailableException`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
         coEvery { localDataSource.getMoviesByCategory(any()) } returns emptyList()
 
         val source = createSource()
@@ -159,7 +159,7 @@ class MoviePagingSourceTest {
 
     @Test
     fun `offline - cached page 1 has null prevKey`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
+        every { networkStatusProvider.isCurrentlyOnline() } returns false
         val cachedMovies = (1..5).map { fakeMovie(id = it) }
         coEvery { localDataSource.getMoviesByCategory(any()) } returns cachedMovies
 

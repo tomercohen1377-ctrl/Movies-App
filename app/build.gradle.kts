@@ -3,8 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.ksp)
 }
 
 android {
@@ -18,10 +16,9 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "com.tcohen.moviesapp.HiltTestRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // TMDB credentials — committed so anyone who clones the repo can run the app.
-        // Both are public read-only and scoped only to TMDB data reads.
         buildConfigField("String", "TMDB_API_KEY", "\"b355446380d009699a7f3d386309528c\"")
         buildConfigField("String", "TMDB_READ_ACCESS_TOKEN", "\"eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiMzU1NDQ2MzgwZDAwOTY5OWE3ZjNkMzg2MzA5NTI4YyIsIm5iZiI6MTc4MDQ3NjMwNS4wODYwMDAyLCJzdWIiOiI2YTFmZTk5MWMxYjZkMzYwM2I2NzYwNWYiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.x_nDchzUfxvVQ7ww2njVgOzst7zhJuCD186CMfP_7gc\"")
         buildConfigField("String", "TMDB_BASE_URL", "\"https://api.themoviedb.org/3/\"")
@@ -65,7 +62,6 @@ android {
 
 dependencies {
     // Shared KMP module — contains all domain, data, shared UI, and androidMain code.
-    // Navigation, Paging, Hilt-navigation, ViewModels, Screens are all transitively provided.
     implementation(project(":shared"))
 
     // ── Android Entry-Point ────────────────────────────────────────────────────
@@ -74,26 +70,25 @@ dependencies {
     implementation(libs.androidx.activity.compose)
 
     // ── Compose (minimal — entry-point only) ──────────────────────────────────
-    // BOM + foundation composables needed by MainActivity setContent + theme
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // ── Hilt DI ───────────────────────────────────────────────────────────────
-    // @HiltAndroidApp / @AndroidEntryPoint / DI modules live here
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
+    // ── Koin DI (Android host) ────────────────────────────────────────────────
+    // koin-core and koin-compose-viewmodel come transitively from :shared
+    // koin-android is needed directly here for startKoin + androidContext in Application
+    implementation(libs.koin.android)
 
-    // ── Networking (NetworkModule builds HttpClient here) ─────────────────────
+    // ── Networking (AppModule builds HttpClient here) ─────────────────────────
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.client.logging)
     implementation(libs.kotlinx.serialization.json)
 
-    // ── Image loading (NetworkModule + MoviesApplication build ImageLoader) ───
+    // ── Image loading (AppModule + MoviesApplication build ImageLoader) ────────
     implementation(libs.coil3.compose)
     implementation(libs.coil3.network.okhttp)
 
@@ -109,8 +104,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
-    // paging-runtime needed for test compilation: PagingData, Pager etc. used in test fixtures.
-    // These types come from :shared (implementation dep), which doesn't expose them to consumers.
+    // paging-runtime needed for test compilation (PagingData, Pager etc. from :shared impl scope)
     testImplementation(libs.androidx.paging.runtime)
     testImplementation(libs.androidx.paging.testing)
 
@@ -119,8 +113,4 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
-
-    // Hilt for full-app journey tests (ActivityScenario + real DI with fakes)
-    androidTestImplementation(libs.hilt.android.testing)
-    kspAndroidTest(libs.hilt.android.compiler)
 }

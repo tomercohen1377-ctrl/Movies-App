@@ -16,6 +16,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // JetBrains AndroidX KMP ports (lifecycle-viewmodel, etc.)
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     }
 }
 

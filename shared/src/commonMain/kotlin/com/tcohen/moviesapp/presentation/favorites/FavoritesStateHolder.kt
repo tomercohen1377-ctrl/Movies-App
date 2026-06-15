@@ -1,7 +1,7 @@
 package com.tcohen.moviesapp.presentation.favorites
 
 import com.tcohen.moviesapp.domain.model.Movie
-import com.tcohen.moviesapp.domain.repository.MovieRepositoryBase
+import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.util.NetworkStatusProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
  * @param scope         the coroutine scope for the holder's internal coroutines.
  */
 class FavoritesStateHolder(
-    private val repository: MovieRepositoryBase,
+    private val repository: MovieRepository,
     private val networkStatus: NetworkStatusProvider,
     private val scope: CoroutineScope
 ) {

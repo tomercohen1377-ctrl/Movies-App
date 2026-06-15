@@ -4,19 +4,29 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
-import dagger.hilt.android.HiltAndroidApp
-import javax.inject.Inject
+import com.tcohen.moviesapp.di.androidSharedModule
+import com.tcohen.moviesapp.di.appModule
+import org.koin.android.ext.android.get
+import org.koin.android.ext.koin.androidContext
+import org.koin.android.ext.koin.androidLogger
+import org.koin.core.context.startKoin
+import org.koin.core.logger.Level
 
-@HiltAndroidApp
 class MoviesApplication : Application(), SingletonImageLoader.Factory {
 
-    // Injected by Hilt — the singleton ImageLoader configured in NetworkModule
-    @Inject lateinit var imageLoader: ImageLoader
+    override fun onCreate() {
+        super.onCreate()
+        startKoin {
+            androidLogger(if (BuildConfig.DEBUG) Level.DEBUG else Level.ERROR)
+            androidContext(this@MoviesApplication)
+            modules(androidSharedModule, appModule)
+        }
+    }
 
     /**
-     * Registers our Hilt-provided [ImageLoader] as the global Coil 3 singleton.
-     * This means every [coil3.compose.AsyncImage] in the app uses the same
-     * OkHttpClient, disk cache, and memory cache automatically.
+     * Returns the Koin-singleton [ImageLoader] as the global Coil 3 image loader.
+     * Every [coil3.compose.AsyncImage] in the app shares the same OkHttpClient,
+     * disk cache, and memory cache automatically.
      */
-    override fun newImageLoader(context: PlatformContext): ImageLoader = imageLoader
+    override fun newImageLoader(context: PlatformContext): ImageLoader = get()
 }

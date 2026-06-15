@@ -7,10 +7,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     // JetBrains Compose Multiplatform runtime + accessors
     alias(libs.plugins.compose.multiplatform)
-    // Hilt — processes @HiltViewModel / @Inject in androidMain
-    alias(libs.plugins.hilt)
-    // KSP — needed to run Hilt's annotation processor for the Android target
-    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -22,11 +18,14 @@ kotlin {
     }
 
     // ── iOS ───────────────────────────────────────────────────────────────────
-    // All three targets share the `iosMain` source set (created automatically
-    // by KMP's default hierarchy). Compilation to native binaries requires macOS.
-    iosX64()
-    iosArm64()
-    iosSimulatorArm64()
+    // Each target exposes a static framework named "shared" so that the Xcode
+    // project can use embedAndSignAppleFrameworkForXcode to embed it.
+    listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "shared"
+            isStatic = true
+        }
+    }
 
     sourceSets {
         // ── Common ────────────────────────────────────────────────────────────
@@ -43,41 +42,48 @@ kotlin {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
             // Coil 3 — KMP image loading
             implementation(libs.coil3.compose)
+            // Koin — KMP-compatible DI
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose.viewmodel)
+            // CashApp Multiplatform Paging — PagingData/PagingSource/Pager in commonMain
+            implementation(libs.cashapp.paging.common)
+            // CashApp Paging Compose — collectAsLazyPagingItems / LazyPagingItems in commonMain
+            implementation(libs.cashapp.paging.compose.common)
+            // JetBrains lifecycle KMP — ViewModel + viewModelScope + collectAsStateWithLifecycle
+            implementation(libs.jetbrains.lifecycle.viewmodel)
+            implementation(libs.jetbrains.lifecycle.viewmodel.compose)
+            // JetBrains navigation KMP — NavHost, composable, rememberNavController in commonMain
+            implementation(libs.jetbrains.navigation.compose)
         }
 
         // ── Android ───────────────────────────────────────────────────────────
         androidMain.dependencies {
             // SQLDelight Android SQLite driver
             implementation(libs.sqldelight.android.driver)
-            // Material Icons Extended — via CMP accessor (resolves correct version per platform)
-            implementation(compose.materialIconsExtended)
             // Coil 3 OkHttp network fetcher (Android-only networking engine)
             implementation(libs.coil3.network.okhttp)
-            // Navigation Compose — for Screen, BottomNavBar, AppNavGraph
-            implementation(libs.androidx.navigation.compose)
             // Paging — runtime for cachedIn/PagingData; compose for collectAsLazyPagingItems
             implementation(libs.androidx.paging.runtime)
             implementation(libs.androidx.paging.compose)
-            // Lifecycle — ViewModel, collectAsStateWithLifecycle, LocalLifecycleOwner
-            implementation(libs.androidx.lifecycle.viewmodel.compose)
+            // Lifecycle — LocalLifecycleOwner for TrailerPlayerSection
             implementation(libs.androidx.lifecycle.runtime.compose)
             // YouTube player — for TrailerPlayerSection
             implementation(libs.youtube.player)
-            // Hilt — DI runtime + Navigation-Compose integration
-            implementation(libs.hilt.android)
-            implementation(libs.androidx.hilt.navigation.compose)
+            // Koin Android — androidContext() helper for Koin modules in androidMain
+            implementation(libs.koin.android)
         }
 
         // ── iOS ───────────────────────────────────────────────────────────────
-        // `iosMain` is the shared parent of iosX64Main, iosArm64Main, iosSimulatorArm64Main.
-        // It is automatically created by KMP's default hierarchy template.
         iosMain.dependencies {
             // Ktor Darwin (URLSession-based) HTTP engine for iOS/macOS
             implementation(libs.ktor.client.darwin)
             // SQLDelight native SQLite driver for iOS
             implementation(libs.sqldelight.native.driver)
+            // Coil 3 — Ktor-based network fetcher for iOS (no OkHttp available)
+            implementation(libs.coil3.network.ktor)
         }
 
         // ── Tests ─────────────────────────────────────────────────────────────
@@ -87,16 +93,9 @@ kotlin {
     }
 }
 
-// Hilt's KSP processor for the Android target.
-// MUST be declared after kotlin {} so that the 'kspAndroid' configuration exists.
-dependencies {
-    add("kspAndroid", libs.hilt.android.compiler)
-}
-
 sqldelight {
     databases {
         create("MoviesDatabase") {
-            // Generated MoviesDatabase class will live in this package.
             packageName.set("com.tcohen.moviesapp.data.local.db")
         }
     }

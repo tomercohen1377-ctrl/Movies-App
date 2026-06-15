@@ -14,21 +14,21 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.tcohen.moviesapp.BuildConfig
 import com.tcohen.moviesapp.MainActivity
-import com.tcohen.moviesapp.data.local.AppDatabase
-import com.tcohen.moviesapp.data.remote.api.TmdbApiService
+import com.tcohen.moviesapp.data.local.LocalMovieDataSource
+import com.tcohen.moviesapp.data.remote.TmdbRemoteDataSource
 import com.tcohen.moviesapp.data.remote.dto.FavoriteRequest
-import dagger.hilt.android.testing.HiltAndroidRule
-import dagger.hilt.android.testing.HiltAndroidTest
-import javax.inject.Inject
+import com.tcohen.moviesapp.domain.model.Category
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 /**
- * Full end-to-end journey tests using the **real** TMDB API, the real Room
+ * Full end-to-end journey tests using the **real** TMDB API, the real SQLDelight
  * database, and the real `MovieRepositoryImpl`.
  *
  * Unlike `AppJourneyTest` (which uses an in-memory fake), these tests exercise
@@ -36,7 +36,7 @@ import org.junit.runner.RunWith
  *
  * - Real HTTP calls to `api.themoviedb.org`
  * - Real OkHttp image cache (Coil loads actual TMDB poster/backdrop images)
- * - Real Room database (cleared before each test via `AppDatabase.clearAllTables()`)
+ * - Real SQLDelight database (cleared before each test)
  *
  * Because content is dynamic, assertions target **structure** rather than
  * specific movie titles: category chips (hardcoded), the presence of at least
@@ -55,33 +55,17 @@ import org.junit.runner.RunWith
  * 6. Detail → toggle favorite → Favorites tab shows the movie
  * 7. Favorites: swipe removes a movie from the list
  */
-@HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
-class RealAppJourneyTest {
+class RealAppJourneyTest : KoinComponent {
 
-    // Hilt rule must come before the Compose rule so the component is ready
-    // when the Activity is created.
-    @get:Rule(order = 0)
-    val hiltRule = HiltAndroidRule(this)
-
-    @get:Rule(order = 1)
+    @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
-    /**
-     * Injected by Hilt after `hiltRule.inject()`. Used to wipe all Room tables before
-     * each test so stale favorites from a previous run don't pollute assertions.
-     */
-    @Inject
-    lateinit var db: AppDatabase
+    /** Injected from Koin — used to clear the SQLDelight local database before/after each test. */
+    private val localDataSource: LocalMovieDataSource by inject()
 
-    /**
-     * Injected so `@After` can remove server-side favorites added during each test.
-     * Without this cleanup the TMDB account accumulates favorites across test runs,
-     * causing the "empty state" and "swipe removes" tests to fail on subsequent runs
-     * (because `FavoritesPagingSource.loadFromNetwork` always fetches from the server).
-     */
-    @Inject
-    lateinit var apiService: TmdbApiService
+    /** Injected from Koin — used to clean server-side favorites before/after each test. */
+    private val remoteDataSource: TmdbRemoteDataSource by inject()
 
     /** TMDB account-id read from build config — same value the DI graph provides. */
     private val accountId: String get() = BuildConfig.TMDB_ACCOUNT_ID
@@ -91,13 +75,12 @@ class RealAppJourneyTest {
 
     @Before
     fun setUp() {
-        hiltRule.inject()
         runBlocking {
             // 1. Remove any server favorites left by a previous test run so the
             //    favorites paging source starts with a clean slate from the API.
             cleanServerFavorites()
-            // 2. Clear Room so locally-cached data is also wiped.
-            db.clearAllTables()
+            // 2. Clear local SQLDelight DB so locally-cached data is also wiped.
+            clearLocalDatabase()
         }
     }
 
@@ -105,8 +88,10 @@ class RealAppJourneyTest {
     fun tearDown() {
         // Remove any server favorites added during this test so the next test
         // starts with a clean state (mirrors what @Before does, but runs after).
-        runBlocking { cleanServerFavorites() }
-        runBlocking { db.clearAllTables() }
+        runBlocking {
+            cleanServerFavorites()
+            clearLocalDatabase()
+        }
     }
 
     // ── 1. Category chips — no network required ───────────────────────────────
@@ -258,7 +243,7 @@ class RealAppJourneyTest {
         pace()
     }
 
-    // ── 7. Swipe to remove in Favorites ────���─────────────────────────────────
+    // ── 7. Swipe to remove in Favorites ──────────────────────────────────────
 
     @Test
     fun swipeLeft_removesMovieFromFavoritesList() {
@@ -300,6 +285,23 @@ class RealAppJourneyTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
+     * Clears all locally cached data from SQLDelight.
+     * Replaces Room's `AppDatabase.clearAllTables()`.
+     */
+    private suspend fun clearLocalDatabase() {
+        // Clear movie cache for every category
+        Category.values().forEach { category ->
+            localDataSource.deleteByCategory(category.name)
+        }
+        // Clear all local favorites (fetch and delete in batches of 50)
+        while (true) {
+            val batch = localDataSource.getFavoritesPaged(limit = 50, offset = 0)
+            if (batch.isEmpty()) break
+            batch.forEach { movie -> localDataSource.deleteFavoriteById(movie.id) }
+        }
+    }
+
+    /**
      * Fetches all currently-favorited movies from the TMDB server and removes
      * each one, leaving the server account in a clean (no favorites) state.
      *
@@ -309,17 +311,10 @@ class RealAppJourneyTest {
      */
     private suspend fun cleanServerFavorites() {
         try {
-            val page1 = apiService.getFavoriteMovies(
-                accountId = accountId,
-                sessionId = sessionId.ifBlank { null }
-            )
-            page1.results.forEach { movie ->
+            val page1 = remoteDataSource.getFavoriteMovies(page = 1)
+            page1.results.forEach { dto ->
                 try {
-                    apiService.markFavorite(
-                        accountId = accountId,
-                        sessionId = sessionId.ifBlank { null },
-                        body = FavoriteRequest(mediaId = movie.id, favorite = false)
-                    )
+                    remoteDataSource.markFavorite(mediaId = dto.id, favorite = false)
                 } catch (_: Exception) { /* best-effort */ }
             }
         } catch (_: Exception) { /* best-effort */ }

@@ -1,7 +1,7 @@
 package com.tcohen.moviesapp.presentation.favorites
 
 import app.cash.turbine.test
-import com.tcohen.moviesapp.domain.repository.MovieRepositoryBase
+import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.fakeMovie
 import com.tcohen.moviesapp.util.MainDispatcherRule
 import com.tcohen.moviesapp.util.NetworkStatusProvider
@@ -24,7 +24,7 @@ import org.junit.Test
 /**
  * Unit tests for [FavoritesStateHolder].
  *
- * Tests use [MovieRepositoryBase] (the shared interface) since the state holder
+ * Tests use [MovieRepository] (the shared interface) since the state holder
  * only needs non-paging operations. Paging tests belong at the ViewModel layer.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -33,7 +33,7 @@ class FavoritesViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val repository: MovieRepositoryBase = mockk()
+    private val repository: MovieRepository = mockk()
     private val networkMonitor: NetworkStatusProvider = mockk()
 
     private lateinit var stateHolder: FavoritesStateHolder

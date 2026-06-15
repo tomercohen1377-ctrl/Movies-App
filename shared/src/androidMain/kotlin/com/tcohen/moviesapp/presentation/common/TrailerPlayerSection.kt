@@ -16,11 +16,10 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTube
 private const val TAG = "TrailerPlayer"
 
 @Composable
-fun TrailerPlayerSection(
+actual fun TrailerPlayerSection(
     trailerKey: String,
-    modifier: Modifier = Modifier,
-    /** Called once the YouTube player is initialised (before the video plays). */
-    onPlayerReady: () -> Unit = {}
+    modifier: Modifier,
+    onPlayerReady: () -> Unit
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
