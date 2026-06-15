@@ -38,7 +38,9 @@ fun RatingBadge(
                 modifier = Modifier.size(11.dp)
             )
             Text(
-                text = "%.1f".format(rating),
+                // "%.1f".format is JVM-only; use KMP-safe rounding instead
+                text = (kotlin.math.round(rating * 10.0) / 10.0).toString()
+                    .let { if ('.' !in it) "$it.0" else it.substringBefore('.') + "." + it.substringAfter('.').take(1) },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )

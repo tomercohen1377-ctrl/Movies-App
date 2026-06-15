@@ -1,6 +1,9 @@
-# Movies App
+# Movies App — Kotlin Multiplatform + Compose Multiplatform
 
-A production-quality Android application that browses movies using [The Movie Database (TMDB) API](https://www.themoviedb.org/documentation/api). Built showcasing Clean Architecture, MVI, Jetpack Compose, Paging 3, typed network error handling, and comprehensive test coverage — including real end-to-end journey tests against the live TMDB API.
+A production-quality **KMP + CMP** app that browses movies using [The Movie Database (TMDB) API](https://www.themoviedb.org/documentation/api).
+Built with Clean Architecture, MVI, Compose Multiplatform, Ktor, SQLDelight, and Koin — targeting **Android and iOS** from a single shared codebase.
+
+> Originally an Android-only app; fully migrated to KMP/CMP. See [`docs/KMP_CMP_MIGRATION_GUIDE.md`](docs/KMP_CMP_MIGRATION_GUIDE.md) for the complete migration log.
 
 ---
 
@@ -26,7 +29,7 @@ A production-quality Android application that browses movies using [The Movie Da
 - [Offline Behaviour](#offline-behaviour)
 - [Error Handling](#error-handling)
 - [Testing](#testing)
-- [Limitations](#limitations)
+- [iOS Limitations](#ios-limitations)
 
 ---
 
@@ -36,51 +39,65 @@ A production-quality Android application that browses movies using [The Movie Da
 |---|---|
 | **2-tab bottom navigation** | Home (movie grid) + Favorites |
 | **Category filter chips** | Now Playing · Top Rated · Upcoming — defaults to Now Playing |
-| **Infinite scroll / Paging 3** | 20 items per page, prefetches the next page automatically |
+| **Infinite scroll / Paging** | 20 items per page, prefetches the next page automatically |
 | **Full-bleed poster cards** | 2:3 aspect-ratio cards with gradient scrim, rating badge, and swipe-to-remove on Favorites |
 | **Movie detail screen** | YouTube trailer at the top, then metadata: title, year, runtime, rating, genre chips, tagline, overview |
 | **Slide navigation animation** | Detail screen slides in from the right; slides back out on back press |
 | **Favorites — server sync** | Add/remove favorites syncs to your TMDB account via `POST /account/{id}/favorite` |
-| **Favorites — paginated** | Favorites grid is driven by Paging 3; online pages come from TMDB, offline from Room |
-| **Favorites — live updates** | Grid refreshes automatically whenever a movie is toggled on **any screen** (detail FAB or favorites swipe) |
-| **Swipe to remove favorites** | Swipe a favorites card left to remove; disabled while offline |
+| **Favorites — paginated** | Favorites grid is driven by CashApp Paging; online pages from TMDB, offline from SQLDelight |
+| **Favorites — live updates** | Grid refreshes whenever a movie is toggled on any screen |
+| **Swipe to remove favorites** | Swipe a card left to remove; disabled while offline |
 | **Offline banner** | Animated banner on both Home and Favorites when connectivity is lost |
-| **Image caching — 1-day TTL** | Coil DiskCache (100 MB) + `Cache-Control: max-age=86400`; images served from disk up to 24 hours |
-| **Offline image serving** | Images cached on disk are served immediately without any network request |
-| **Typed error handling** | `NetworkResult<T>` sealed class; HTTP error messages come from TMDB's `status_message` body; connectivity errors mapped to `ApiError` enum entries |
+| **Image caching — 1-day TTL** | Coil 3 DiskCache (100 MB); images served from disk up to 24 hours |
+| **Typed error handling** | `NetworkResult<T>` sealed class; HTTP errors use TMDB's `status_message`; connectivity errors mapped to `ApiError` enum |
 
 ---
 
 ## Architecture
 
 ```
-UI Layer  (Compose + MVI — State / Intent / Effect)
+UI Layer        Compose Multiplatform screens + MVI (State / Intent / Effect)
     ↕
-Domain Layer  (repository interface + domain models)
+Domain Layer    Repository interface + domain models  — commonMain
     ↕
-Data Layer  (Retrofit + Room + Paging 3 + Coil)
+Data Layer      Ktor + SQLDelight + CashApp Paging    — commonMain
+                Platform drivers (SQLite, network)    — androidMain / iosMain
 ```
 
 ### MVI Pattern
 
 Each screen has a `Contract` file defining:
-- **State** — immutable snapshot of what the screen should display (collected as `StateFlow`)
+- **State** — immutable snapshot collected as `StateFlow`
 - **Intent** — user actions dispatched via `processIntent()`
-- **Effect** — one-shot navigation or side-effect events (sent via a `Channel`, where applicable)
+- **Effect** — one-shot navigation or side-effect events via `Channel`
 
-### Detail Screen — Sealed UI State
+A **`StateHolder`** in `commonMain` owns all the business logic. The `ViewModel` (also in `commonMain`, injected by Koin) wraps it and adds the paging `Flow`.
 
-`MovieDetailScreen` uses a **sealed interface** instead of a flat state class:
+### Movie Detail — Sealed UI State
 
 ```kotlin
 sealed interface MovieDetailUiState {
     data object Loading : MovieDetailUiState
     data class Error(val message: String) : MovieDetailUiState
-    data class Success(val movie: MovieDetail, val trailerKey: String?, val isFavorite: Boolean) : MovieDetailUiState
+    data class Success(
+        val movie: MovieDetail,
+        val trailerKey: String?,
+        val isFavorite: Boolean
+    ) : MovieDetailUiState
 }
 ```
 
 The FAB is only rendered inside the `Success` branch — impossible to show during loading or error.
+
+### KMP `expect/actual` Surface
+
+| Symbol | commonMain | androidMain | iosMain |
+|--------|------------|-------------|---------|
+| `MoviesAppTheme` | `expect fun` | Dynamic color + WindowCompat | Static Material 3 colors |
+| `DatabaseDriverFactory` | `expect class` | `AndroidSqliteDriver` | `NativeSqliteDriver` |
+| `TrailerPlayerSection` | `expect fun` | YouTube `AndroidView` | WKWebView placeholder |
+| `currentTimeMillis` | `expect fun` | `System.currentTimeMillis()` | `NSDate` epoch |
+| `NetworkStatusProvider` | interface | `NetworkMonitor` (ConnectivityManager) | `IosNetworkStatusProvider` (NWPathMonitor) |
 
 ---
 
@@ -88,53 +105,81 @@ The FAB is only rendered inside the `Success` branch — impossible to show duri
 
 | Layer | Library / Tool |
 |---|---|
-| UI | Jetpack Compose + Material 3 |
-| State management | MVI (ViewModel + `StateFlow` + `Channel`) |
-| DI | Hilt |
-| Navigation | Compose Navigation with slide animations |
-| Networking | Retrofit 2 + OkHttp 4 + Kotlin Serialization |
-| Image loading | Coil 2 with dedicated `OkHttpClient` + `DiskCache` (1-day TTL) |
-| Local DB | Room (v1) |
-| Paging | Paging 3 (`PagingSource` → `LazyPagingItems`) |
-| Video | YouTube Android Player library (embedded WebView) |
-| Async | Kotlin Coroutines + Flow |
-| Unit testing | JUnit 4 + MockK + Turbine + `paging-testing` |
-| UI testing | Compose UI Test (`createComposeRule`) |
-| E2E journey tests | Hilt + `@HiltAndroidTest` + `ActivityScenario` against live TMDB API |
+| **UI** | Compose Multiplatform 1.7.3 + Material 3 |
+| **State management** | MVI — `StateHolder` + `ViewModel` + `StateFlow` + `Channel` |
+| **DI** | Koin 4.0.0 (KMP-compatible) |
+| **Navigation** | JetBrains KMP Navigation Compose (`org.jetbrains.androidx.navigation`) |
+| **Networking** | Ktor 2.3.12 (OkHttp engine on Android, Darwin/URLSession on iOS) |
+| **Image loading** | Coil 3.1.0 (OkHttp fetcher on Android, Ktor fetcher on iOS) |
+| **Local DB** | SQLDelight 2.0.2 (Android SQLite driver · iOS Native driver) |
+| **Paging** | CashApp Multiplatform Paging 3.3.0 |
+| **Video** | YouTube Android Player library (Android) · WKWebView placeholder (iOS) |
+| **Async** | Kotlin Coroutines + Flow |
+| **ViewModel** | JetBrains lifecycle-viewmodel KMP (`org.jetbrains.androidx.lifecycle`) |
+| **Unit testing** | JUnit 4 + MockK + Turbine + `paging-testing` (`:app`) · `kotlin.test` (`:shared`) |
+| **Build** | Kotlin 2.1.20 · AGP 8.8.2 · Gradle 9.4.1 |
 
 ---
 
 ## Project Structure
 
 ```
-app/src/main/java/com/tcohen/moviesapp/
-├── data/
-│   ├── local/              # Room DB (v1), AppDatabase, DAOs (MovieDao, FavoriteDao), entities
-│   ├── remote/
-│   │   ├── api/            # TmdbApiService, SafeApiCall wrapper
-│   │   ├── dto/            # Request/Response DTOs (suffixed *Request / *Response)
-│   │   ├── interceptor/    # AuthInterceptor (Bearer token)
-│   │   └── paging/         # MoviePagingSource, FavoritesPagingSource, PagingDefaults
-│   ├── repository/         # MovieRepositoryImpl
-│   └── mapper/             # DTO ↔ Domain ↔ Entity mappers
-├── domain/
-│   ├── model/              # Movie, MovieDetail, Genre, VideoResult, Category, CategoryExt
-│   └── repository/         # MovieRepository interface
-├── presentation/
-│   ├── home/               # HomeScreen, HomeViewModel, HomeContract
-│   ├── moviedetail/        # MovieDetailScreen, MovieDetailContent, MovieMetadata,
-│   │                       # MovieDetailViewModel, MovieDetailContract
-│   ├── favorites/          # FavoritesScreen, FavoritesComponents, FavoritesViewModel,
-│   │                       # FavoritesContract
-│   ├── common/             # MovieCard, MovieGrid, MoviePosterImage, CategoryFilterRow,
-│   │                       # RatingBadge, TrailerPlayerSection, NetworkErrorFooter,
-│   │                       # ErrorView, OfflineBanner
-│   ├── navigation/         # AppNavGraph (slide transitions), BottomNavBar, Screen
-│   └── theme/              # MoviesAppTheme, Typography
-���── di/                     # Hilt modules (NetworkModule, DatabaseModule,
-│                           #   RepositoryModule, UtilModule)
-└── util/                   # NetworkMonitor, TmdbImageUrl, NetworkResult,
-                            # ApiError, NetworkUnavailableException
+Movies-App/
+├── app/                        ← Android entry point — 3 files only
+│   └── src/main/
+│       ├── MainActivity.kt         @ComponentActivity, sets content
+│       ├── MoviesApplication.kt    startKoin + Coil SingletonImageLoader
+│       └── di/AppModule.kt         Koin module: HttpClient, ImageLoader, Repository, VMs
+│
+├── shared/                     ← KMP + CMP module (everything else lives here)
+│   └── src/
+│       ├── commonMain/         54 files — truly cross-platform
+│       │   ├── data/
+│       │   │   ├── local/          LocalMovieDataSource (SQLDelight queries)
+│       │   │   ├── remote/         TmdbRemoteDataSource (Ktor), SafeApiCall,
+│       │   │   │                   DTOs (6 files), MoviePagingSource, FavoritesPagingSource
+│       │   │   ├── repository/     MovieRepository (interface) + MovieRepositoryImpl
+│       │   │   └── mapper/         MovieDtoMapper (DTO → domain)
+│       │   ├── domain/model/       Movie, MovieDetail, Genre, VideoResult, Category
+│       │   ├── presentation/
+│       │   │   ├── common/         MovieCard, MovieGrid, MoviePosterImage, RatingBadge,
+│       │   │   │                   CategoryFilterRow, NetworkErrorFooter, OfflineBanner,
+│       │   │   │                   ErrorView, TrailerPlayerSection (expect)
+│       │   │   ├── home/           HomeScreen, HomeViewModel, HomeStateHolder, HomeContract
+│       │   │   ├── moviedetail/    MovieDetailScreen, MovieDetailContent, MovieMetadata,
+│       │   │   │                   MovieDetailViewModel, MovieDetailStateHolder, MovieDetailContract
+│       │   │   ├── favorites/      FavoritesScreen, FavoritesComponents,
+│       │   │   │                   FavoritesViewModel, FavoritesStateHolder, FavoritesContract
+│       │   │   ├── navigation/     AppNavGraph, Screen, BottomNavBar, BottomNavItem
+│       │   │   └── theme/          Theme (expect MoviesAppTheme), Type
+│       │   └── util/               NetworkResult, ApiError, TmdbImageUrl,
+│       │                           NetworkStatusProvider (interface), NetworkUnavailableException,
+│       │                           PagingDefaults, Platform (expect currentTimeMillis)
+│       │
+│       ├── androidMain/        6 Android-specific actuals
+│       │   ├── di/             AndroidSharedModule (Koin androidContext)
+│       │   ├── data/local/     DatabaseDriverFactory (AndroidSqliteDriver)
+│       │   ├── util/           NetworkMonitor (ConnectivityManager)
+│       │   └── presentation/
+│       │       ├── common/     TrailerPlayerSection (YouTubePlayerView via AndroidView)
+│       │       └── theme/      Theme (dynamic color + WindowCompat)
+│       │
+│       └── iosMain/            10 iOS-specific files
+│           ├── di/             IosAppConfig, IosSharedModule, IosAppModule, KoinHelper
+│           ├── data/local/     DatabaseDriverFactory (NativeSqliteDriver)
+│           ├── util/           IosNetworkStatusProvider (NWPathMonitor)
+│           └── presentation/
+│               ├── common/     TrailerPlayerSection (WKWebView placeholder)
+│               ├── theme/      Theme (static M3 colors)
+│               └──             MainViewController (ComposeUIViewController)
+│
+└── iosApp/                     Xcode project (open on Mac with Xcode 15+)
+    ├── iosApp.xcodeproj/
+    └── iosApp/
+        ├── iOSApp.swift         @main — calls KoinHelper.initKoin()
+        ├── ContentView.swift    UIViewControllerRepresentable → MainViewController
+        ├── Config.swift         TMDB credentials placeholder
+        └── Info.plist
 ```
 
 ---
@@ -145,29 +190,54 @@ app/src/main/java/com/tcohen/moviesapp/
 
 - Android Studio Meerkat or later
 - Android SDK 26+ (minSdk) / targets SDK 35
-- Internet connection (TMDB API calls)
+- For iOS: Mac with Xcode 15+ and a physical device or simulator
 
-### Clone and Run
+### Android
 
 ```bash
 git clone <repo-url>
 cd Movies-App
 ```
 
-> **No setup required.** The TMDB API key and Read Access Token are committed directly in `app/build.gradle.kts` so the app works out of the box. Both are **read-only** credentials scoped to TMDB public data reads.
+> **No setup required.** The TMDB API key and Read Access Token are committed in `app/build.gradle.kts`. Both are read-only credentials.
 
-Open in Android Studio and click **Run** on any device or emulator running API 26+.
+Open in Android Studio and click **Run**, or:
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+### iOS (Mac only)
+
+**Step 1** — Fill in your TMDB credentials in `iosApp/iosApp/Config.swift`:
+
+```swift
+enum TmdbConfig {
+    static let apiKey        = "your_api_key"
+    static let readToken     = "your_read_access_token"
+    static let accountId     = "your_account_id"   // optional, for favorites sync
+    static let sessionId     = ""                   // optional, for v3 session auth
+}
+```
+
+**Step 2** — Open the Xcode project and press ▶:
+
+```bash
+open iosApp/iosApp.xcodeproj
+```
+
+The "Compile Kotlin" script phase in Xcode automatically builds the shared KMP framework before each run.
 
 ### Optional: TMDB Account Sync
 
-To enable server-side favorites sync, fill in the build config fields in `app/build.gradle.kts`:
+To enable server-side favorites on Android, fill in the build config fields in `app/build.gradle.kts`:
 
 ```kotlin
 buildConfigField("String", "TMDB_ACCOUNT_ID", "\"your_account_id\"")
-buildConfigField("String", "TMDB_SESSION_ID", "\"your_session_id\"")  // v3 session
+buildConfigField("String", "TMDB_SESSION_ID", "\"your_session_id\"")
 ```
 
-Without these, favorites are still fully functional — changes are saved locally in Room and a best-effort sync is attempted using the Bearer token.
+Without these, favorites are saved locally in SQLDelight with a best-effort server sync using the Bearer token.
 
 ---
 
@@ -175,29 +245,29 @@ Without these, favorites are still fully functional — changes are saved locall
 
 ### Image Caching
 
-Images use a **two-tier cache** with a hard 1-day expiry:
+Images use a **two-tier Coil 3 cache** with a 1-day expiry:
 
 | Tier | Storage | TTL | Purpose |
 |---|---|---|---|
-| Memory cache | RAM (25% of available) | Process lifetime | Instant display; no I/O for already-seen posters |
-| Disk cache (`image_cache/`, 100 MB) | Internal storage | 24 hours | Survives app kills and device restarts |
+| Memory cache | RAM (25% of available) | Process lifetime | Instant display for recently seen posters |
+| Disk cache (`image_cache/`, 100 MB) | Internal storage | 24 hours | Survives app kills and restarts |
 
-Coil uses a **dedicated `OkHttpClient`** (separate from Retrofit's API client). A network interceptor stamps every image response with `Cache-Control: max-age=86400`. After 24 hours Coil re-fetches from TMDB's CDN. While within the TTL — including when the device is offline — images are served directly from the Coil `DiskCache`.
+On Android, Coil uses a dedicated `OkHttpClient` with a custom `NetworkFetcher` that stamps responses with `Cache-Control: max-age=86400`. On iOS, Coil uses the Ktor Darwin fetcher with equivalent caching.
 
-### Movie List Caching (Room)
+### Movie List Caching (SQLDelight)
 
-`MoviePagingSource` caches pages in the `movies` Room table:
+`MoviePagingSource` caches pages in the `Movie` SQLDelight table:
 
-- **Online (page 1):** old cached rows for the category are **cleared first**, then fresh data is inserted. This prevents stale entries from lingering after TMDB updates its lists.
-- **Online (page N > 1):** rows appended to the existing cache.
-- **Offline:** pages already in Room are served freely; hitting a page that isn't cached returns `LoadResult.Error(NetworkUnavailableException)`, which Paging 3 renders as an inline `NetworkErrorFooter` — not a full-screen takeover.
+- **Online (page 1):** old cached rows for the category are cleared first, then fresh data is inserted.
+- **Online (page N > 1):** rows are appended to the existing cache.
+- **Offline:** pages already cached are served freely; hitting an uncached page returns `LoadResult.Error(NetworkUnavailableException)`, which renders as a `NetworkErrorFooter` at the bottom — not a full-screen takeover.
 
-### Favorites Caching (Room + Server)
+### Favorites Caching (SQLDelight + Server)
 
-Favorite movies are stored in the `favorites` Room table and synced to the TMDB server:
+Favorites are stored in the `Favorite` SQLDelight table and synced to TMDB:
 
-- **Online:** `FavoritesPagingSource` fetches directly from `GET /account/{id}/favorite/movies` and caches results to Room.
-- **Offline:** falls back to `favorites` table ordered by `savedAt DESC` (most recently added first).
+- **Online:** `FavoritesPagingSource` fetches from `GET /account/{id}/favorite/movies` and caches to SQLDelight.
+- **Offline:** falls back to the `Favorite` table ordered by `savedAt DESC`.
 
 ---
 
@@ -205,19 +275,19 @@ Favorite movies are stored in the `favorites` Room table and synced to the TMDB 
 
 | Scenario | Behaviour |
 |---|---|
-| Scrolling within cached movie pages | Served from Room — no network needed, no error shown |
+| Scrolling within cached pages | Served from SQLDelight — no network needed |
 | Scrolling past cached pages | `NetworkErrorFooter` at the bottom; list above remains scrollable |
-| Opening movie detail while offline | Full-screen `ErrorView` with Retry button |
-| Trailer when offline | Backdrop image shown — no crash, no error banner |
-| Images when offline | Served from Coil DiskCache (if fetched within the last 24 hours) |
-| Favorites while offline | Room cache served; swipe-to-remove disabled; offline banner shown |
-| Returning online | Paging retries automatically; detail screen shows Retry |
+| Opening movie detail while offline | Full-screen `ErrorView` with Retry |
+| Trailer while offline | Backdrop image shown — no crash |
+| Images while offline | Served from Coil DiskCache (if fetched within 24 hours) |
+| Favorites while offline | SQLDelight cache served; swipe-to-remove disabled; offline banner shown |
+| Returning online | Paging retries automatically |
 
 ---
 
 ## Error Handling
 
-All API calls go through `safeApiCall`, which maps every failure to `NetworkResult<T>`:
+All API calls go through `safeApiCall` (Ktor-based), which maps every failure to `NetworkResult<T>`:
 
 ```kotlin
 sealed class NetworkResult<out T> {
@@ -226,85 +296,68 @@ sealed class NetworkResult<out T> {
 }
 ```
 
-- **HTTP errors:** the TMDB error body (`{"status_message": "..."}`) is parsed and its `statusMessage` is used as the user-facing string. If parsing fails, `ApiError.SERVER_ERROR.message` is the fallback.
-- **Connectivity errors:** mapped to `ApiError` enum entries (`NO_CONNECTION`, `TIMEOUT`, `UNEXPECTED`), which own their display strings in one place.
-- **Paging errors:** `LoadResult.Error(e)` propagates to `LoadState.Error`; the UI renders `NetworkErrorFooter` (inline) or `ErrorView` (full-screen) accordingly.
+- **HTTP errors:** TMDB error body (`{"status_message": "..."}`) is parsed; `ApiError.SERVER_ERROR` is the fallback.
+- **Connectivity errors:** mapped to `ApiError` enum entries (`NO_CONNECTION`, `TIMEOUT`, `UNEXPECTED`).
+- **Paging errors:** `LoadResult.Error(e)` propagates to `LoadStateError`; the UI renders `NetworkErrorFooter` (inline) or `ErrorView` (full-screen).
 
 ---
 
 ## Testing
 
-### Unit Tests — 101 tests (run on JVM, no device needed)
+### Unit Tests (run on JVM — no device needed)
 
 ```bash
-./gradlew testDebugUnitTest
+./gradlew :app:testDebugUnitTest :shared:testDebugUnitTest
 ```
 
-| Suite | Tests | What's covered |
+| Module | Suite | What's covered |
 |---|---|---|
-| `HomeViewModelTest` | 9 | Category selection, offline state, network error, paging flow |
-| `MovieDetailViewModelTest` | 12 | All UI states (Loading/Success/Error), trailer degradation, favorite toggle, HTTP error codes |
-| `FavoritesViewModelTest` | 4 | Offline state, remove favorite, paging flow |
-| `MoviePagingSourceTest` | 10 | Online/offline paths, page keys, error cases |
-| `FavoritesPagingSourceTest` | 11 | Online/offline paths, offset pagination, next-page detection |
-| `MovieRepositoryImplTest` | 13 | `getMovieDetail`, `getTrailer`, `toggleFavorite`, server sync |
-| `MovieMapperTest` | 12 | DTO → domain, domain → entity, round-trips |
-| `TmdbImageUrlTest` | 9 | `poster()`, `posterLarge()`, `backdrop()` — null and non-null inputs |
-| `CategoryExtTest` | 9 | `displayName` for all categories, ordering, uniqueness |
-| `ApiErrorTest` | 7 | All enum entries, unique messages, `NetworkResult.Error` round-trip |
-| `MainDispatcherRule` | — | Test infrastructure (coroutine dispatcher swap) |
+| `:app` | `HomeViewModelTest` | Category selection, offline state, network error, paging flow |
+| `:app` | `MovieDetailViewModelTest` | All UI states (Loading/Success/Error), trailer degradation, favorite toggle |
+| `:app` | `FavoritesViewModelTest` | Offline state, remove favorite, paging flow |
+| `:app` | `MoviePagingSourceTest` | Online/offline paths, page keys, error cases |
+| `:app` | `FavoritesPagingSourceTest` | Online/offline paths, offset pagination |
+| `:app` | `MovieRepositoryImplTest` | `getMovieDetail`, `getTrailer`, `toggleFavorite`, server sync |
+| `:shared` | `MovieDtoMapperTest` | DTO → domain mapping |
+| `:shared` | `TmdbImageUrlTest` | `poster()`, `posterLarge()`, `backdrop()` — null and non-null |
+| `:shared` | `CategoryExtTest` | `displayName` for all categories |
+| `:shared` | `ApiErrorTest` | All enum entries, unique messages |
 
-### UI Component Tests — 79 tests (run on device/emulator)
+All `:shared` tests use `kotlin.test` and run on the JVM Android target (and can run on iOS targets when compiled for that platform).
 
-```bash
-./gradlew connectedDebugAndroidTest
-```
-
-| Suite | What's tested |
-|---|---|
-| `MovieCardTest` | Title rendering, rating badge, click callback, test tag |
-| `CategoryFilterRowTest` | Selected chip highlighting, chip tap callback |
-| `RatingBadgeTest` | Score formatting and display |
-| `NetworkErrorFooterTest` | Visibility on error, retry callback |
-| `MoviePosterImageTest` | Renders with and without URL, content description |
-| `ErrorViewTest` | Message display, retry button, callback |
-| `OfflineBannerTest` | Shows when offline, hidden when online |
-| `TrailerPlayerSectionTest` | Player container shown with key, backdrop shown without |
-| `MovieMetadataTest` | Title, year, runtime, genres, tagline, overview, rating |
-| `MovieDetailContentTest` | Backdrop/poster nodes, trailer vs. no-trailer paths |
-| `FavoritesScreenTest` | Empty state composable isolation |
-| `HomeScreenFlowTest` | Category chips, movie grid, card tap callback, offline banner |
-| `MovieDetailFlowTest` | Error/retry, success state, Loading → Success transition |
-| `FavoritesFlowTest` | Empty state, populated grid, error state, offline banner, state transition |
-
-### End-to-End Journey Tests — 8 tests (run on device against live TMDB API)
+### End-to-End Journey Test (live TMDB API — device required)
 
 ```bash
 ./gradlew connectedDebugAndroidTest
 ```
 
-`RealAppJourneyTest` launches the full `MainActivity` via Hilt with the **real `MovieRepositoryImpl`**, real Room database, and real TMDB network calls. Uses `@HiltAndroidTest` + a custom `HiltTestRunner`.
+`RealAppJourneyTest` launches `MainActivity` with the **real** `MovieRepositoryImpl`, real SQLDelight database, and real TMDB network calls. Each test cleans up after itself (clears the local DB and un-favorites any movies added during the test).
 
 | Journey | What's validated |
 |---|---|
-| `homeScreen_loadsRealMoviesFromTmdb` | Movie cards appear in the grid from a live API response |
+| `homeScreen_loadsRealMoviesFromTmdb` | Movie cards appear from a live API response |
 | `homeScreen_categoryChips_visible` | All 3 category chips are displayed |
-| `homeScreen_tapMovieCard_opensDetailScreen` | Tapping a card navigates to the detail screen |
-| `detailScreen_navigateBack_returnsToHome` | Back button returns to the home grid |
-| `favoritesTab_showsEmptyState_initially` | Empty heart + "No saved movies yet" shown on first launch |
-| `toggleFavorite_movieAppearsInFavoritesTab` | FAB toggle adds a movie; it appears in the Favorites tab |
-| `swipeLeft_removesMovieFromFavoritesList` | Swipe-to-dismiss removes a movie from the grid |
-| `favoritesTab_showsOnlyFavoritedMovies` | Only movies explicitly favorited appear in the tab |
-
-**Infrastructure:**
-- `HiltTestRunner` — custom `AndroidJUnitRunner` that boots `HiltTestApplication`
-- `@Before` / `@After` — clears both Room (`db.clearAllTables()`) and the TMDB server favorites (`markFavorite(favorite = false)` for every favorited movie) so tests are fully isolated
+| `homeScreen_tapMovieCard_opensDetailScreen` | Tapping a card navigates to detail |
+| `detailScreen_navigateBack_returnsToHome` | Back button returns to the grid |
+| `favoritesTab_showsEmptyState_initially` | Empty state shown on first launch |
+| `toggleFavorite_movieAppearsInFavoritesTab` | FAB toggle adds a movie to Favorites |
+| `swipeLeft_removesMovieFromFavoritesList` | Swipe-to-dismiss removes the card |
+| `favoritesTab_showsOnlyFavoritedMovies` | Only explicitly favorited movies appear |
 
 ---
 
-## Limitations
+## iOS Limitations
 
-- Trailer playback requires internet (YouTube player); the trailer section degrades to the backdrop image when offline.
-- Movie detail and trailers are always fetched live — they are not cached in Room.
-- Favorites server sync (`GET /favorite/movies`) works with the Bearer token. Adding/removing (`POST /account/{id}/favorite`) also uses the Bearer token; pass a `TMDB_SESSION_ID` in `build.gradle.kts` if your account requires v3 session auth.
-- Journey tests require a live internet connection and will attempt a best-effort cleanup of server favorites after each test.
+| Feature | Android | iOS |
+|---------|---------|-----|
+| **Trailers** | YouTube embedded player | WKWebView placeholder — see migration guide for full SFSafariViewController implementation |
+| **Dynamic theme** | Android 12+ Material You | Static Material 3 color scheme |
+| **Build platform** | Windows / Mac / Linux | Mac with Xcode 15+ only |
+
+---
+
+## Migration Notes
+
+This project was migrated from Android-only to KMP + CMP. The full phase-by-phase log, technology replacement table, and all `expect/actual` design decisions are documented in:
+
+**[`docs/KMP_CMP_MIGRATION_GUIDE.md`](docs/KMP_CMP_MIGRATION_GUIDE.md)**

@@ -101,6 +101,16 @@ sqldelight {
     }
 }
 
+// Disable the SQLDelight migration-verification tasks — we have no .sqm migration files
+// and the verifier requires the native sqlitejdbc library which is not bundled on Windows.
+afterEvaluate {
+    tasks.matching { task ->
+        task.name.startsWith("verify") && task.name.contains("MoviesDatabaseMigration")
+    }.configureEach {
+        enabled = false
+    }
+}
+
 android {
     namespace = "com.tcohen.moviesapp.shared"
     compileSdk = 35
