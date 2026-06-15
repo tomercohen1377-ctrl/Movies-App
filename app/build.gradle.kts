@@ -28,11 +28,6 @@ android {
         buildConfigField("String", "TMDB_IMAGE_BASE_URL", "\"https://image.tmdb.org/t/p/\"")
 
         // TMDB account credentials for favorites server sync.
-        // TMDB_ACCOUNT_ID: use "me" (works with v4 Bearer read token for GET)
-        //   or replace with your numeric TMDB account ID for v3 session auth.
-        // TMDB_SESSION_ID: required for write operations (add/remove favorite).
-        //   Obtain via the TMDB v3 authentication flow:
-        //   GET /authentication/token/new → authorize → POST /authentication/session/new
         buildConfigField("String", "TMDB_ACCOUNT_ID", "\"me\"")
         buildConfigField("String", "TMDB_SESSION_ID", "\"\"")
     }
@@ -63,76 +58,63 @@ android {
 
     testOptions {
         unitTests {
-            // Allow Android framework classes (e.g. android.util.Log) to return default
-            // values in unit tests instead of throwing "not mocked" RuntimeException.
             isReturnDefaultValues = true
         }
     }
 }
 
 dependencies {
-    // Core
+    // Shared KMP module — contains all domain, data, shared UI, and androidMain code.
+    // Navigation, Paging, Hilt-navigation, ViewModels, Screens are all transitively provided.
+    implementation(project(":shared"))
+
+    // ── Android Entry-Point ────────────────────────────────────────────────────
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 
-    // Compose
+    // ── Compose (minimal — entry-point only) ──────────────────────────────────
+    // BOM + foundation composables needed by MainActivity setContent + theme
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.extended)
 
-    // Navigation
-    implementation(libs.androidx.navigation.compose)
-
-    // Hilt
+    // ── Hilt DI ───────────────────────────────────────────────────────────────
+    // @HiltAndroidApp / @AndroidEntryPoint / DI modules live here
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
 
-    // Network
-    implementation(libs.retrofit)
-    implementation(libs.okhttp.logging.interceptor)
+    // ── Networking (NetworkModule builds HttpClient here) ─────────────────────
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.client.logging)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.retrofit.kotlinx.serialization)
 
-    // Image
-    implementation(libs.coil.compose)
+    // ── Image loading (NetworkModule + MoviesApplication build ImageLoader) ───
+    implementation(libs.coil3.compose)
+    implementation(libs.coil3.network.okhttp)
 
-    // Room
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-
-    // Paging
-    implementation(libs.androidx.paging.runtime)
-    implementation(libs.androidx.paging.compose)
-
-    // Media3 (embedded trailer player)
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.ui)
-
-    // YouTube Player (trailer embedding)
-    implementation(libs.youtube.player)
-
-    // Coroutines
+    // ── Coroutines ────────────────────────────────────────────────────────────
     implementation(libs.kotlinx.coroutines.android)
 
-    // Debug tooling
+    // ── Debug tooling ─────────────────────────────────────────────────────────
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // Unit tests
+    // ── Unit tests ────────────────────────────────────────────────────────────
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
+    // paging-runtime needed for test compilation: PagingData, Pager etc. used in test fixtures.
+    // These types come from :shared (implementation dep), which doesn't expose them to consumers.
+    testImplementation(libs.androidx.paging.runtime)
     testImplementation(libs.androidx.paging.testing)
 
-    // Instrumented tests
+    // ── Instrumented tests ────────────────────────────────────────────────────
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

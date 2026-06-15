@@ -1,0 +1,27 @@
+-- User-favorited movies — local copy for offline access.
+-- savedAt stores epoch-milliseconds (Long); LocalMovieDataSource provides the timestamp.
+
+CREATE TABLE favorites (
+    id          INTEGER NOT NULL PRIMARY KEY,
+    title       TEXT    NOT NULL,
+    overview    TEXT    NOT NULL,
+    posterPath  TEXT,
+    backdropPath TEXT,
+    releaseDate TEXT    NOT NULL,
+    voteAverage REAL    NOT NULL,
+    voteCount   INTEGER NOT NULL,
+    savedAt     INTEGER NOT NULL
+);
+
+insertOrReplace:
+INSERT OR REPLACE INTO favorites(id, title, overview, posterPath, backdropPath, releaseDate, voteAverage, voteCount, savedAt)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteById:
+DELETE FROM favorites WHERE id = ?;
+
+isFavoriteById:
+SELECT EXISTS(SELECT 1 FROM favorites WHERE id = ?);
+
+getFavoritesPaged:
+SELECT * FROM favorites ORDER BY savedAt DESC LIMIT ? OFFSET ?;

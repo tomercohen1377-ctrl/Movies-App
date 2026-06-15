@@ -1,0 +1,28 @@
+-- Movie list cache — one row per movie per category per page.
+-- All INTEGER columns use SQLite's native Long; LocalMovieDataSource converts to Int.
+
+CREATE TABLE movies (
+    id          INTEGER NOT NULL PRIMARY KEY,
+    title       TEXT    NOT NULL,
+    overview    TEXT    NOT NULL,
+    posterPath  TEXT,
+    backdropPath TEXT,
+    releaseDate TEXT    NOT NULL,
+    voteAverage REAL    NOT NULL,
+    voteCount   INTEGER NOT NULL,
+    category    TEXT    NOT NULL,
+    page        INTEGER NOT NULL
+);
+
+insertOrReplace:
+INSERT OR REPLACE INTO movies(id, title, overview, posterPath, backdropPath, releaseDate, voteAverage, voteCount, category, page)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getByCategory:
+SELECT * FROM movies WHERE category = ? ORDER BY page ASC;
+
+deleteByCategory:
+DELETE FROM movies WHERE category = ?;
+
+getLastCachedPage:
+SELECT MAX(page) FROM movies WHERE category = ?;

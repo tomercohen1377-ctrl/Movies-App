@@ -1,10 +1,8 @@
 package com.tcohen.moviesapp.presentation.moviedetail
 
-import androidx.lifecycle.SavedStateHandle
-import com.tcohen.moviesapp.domain.repository.MovieRepository
+import com.tcohen.moviesapp.domain.repository.MovieRepositoryBase
 import com.tcohen.moviesapp.fakeMovieDetail
 import com.tcohen.moviesapp.fakeVideoResult
-import com.tcohen.moviesapp.presentation.navigation.Screen
 import com.tcohen.moviesapp.util.ApiError
 import com.tcohen.moviesapp.util.MainDispatcherRule
 import com.tcohen.moviesapp.util.NetworkResult
@@ -13,7 +11,9 @@ import io.mockk.coJustRun
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -24,25 +24,32 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * Unit tests for [MovieDetailStateHolder].
+ *
+ * Compared with the old ViewModel tests, there is no [SavedStateHandle] dependency —
+ * [movieId] is passed directly, making tests simpler and fully platform-agnostic.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MovieDetailViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val repository: MovieRepository = mockk()
+    private val repository: MovieRepositoryBase = mockk()
 
-    private fun savedStateHandleFor(movieId: Int = 1) =
-        SavedStateHandle(mapOf(Screen.MovieDetail.ARG_MOVIE_ID to movieId))
-
-    private fun createViewModel(movieId: Int = 1): MovieDetailViewModel =
-        MovieDetailViewModel(repository, savedStateHandleFor(movieId))
+    private fun createStateHolder(movieId: Int? = 1): MovieDetailStateHolder =
+        MovieDetailStateHolder(
+            movieId,
+            repository,
+            CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob())
+        )
 
     // Convenience accessors for the sealed state ─────────────────────────────
-    private val MovieDetailViewModel.successState
+    private val MovieDetailStateHolder.successState
         get() = uiState.value as? MovieDetailUiState.Success
 
-    private val MovieDetailViewModel.errorMessage
+    private val MovieDetailStateHolder.errorMessage
         get() = (uiState.value as? MovieDetailUiState.Error)?.message
 
     // ── Successful load ───────────────────────────────────────────────────────
@@ -56,12 +63,11 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        val state = vm.successState
-        assertNotNull(state)
-        assertEquals(detail, state?.movie)
-        assertEquals("abc123", state?.trailerKey)
+        assertNotNull(sh.successState)
+        assertEquals(detail, sh.successState?.movie)
+        assertEquals("abc123", sh.successState?.trailerKey)
     }
 
     @Test
@@ -71,9 +77,9 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        assertNull(vm.successState?.trailerKey)
+        assertNull(sh.successState?.trailerKey)
     }
 
     @Test
@@ -83,11 +89,11 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
         // Movie still shows but trailer is absent — not an Error state
-        assertNotNull(vm.successState?.movie)
-        assertNull(vm.successState?.trailerKey)
+        assertNotNull(sh.successState?.movie)
+        assertNull(sh.successState?.trailerKey)
     }
 
     // ── Error handling ────────────────────────────────────────────────────────
@@ -99,11 +105,11 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        assertTrue(vm.uiState.value is MovieDetailUiState.Error)
-        assertEquals(ApiError.NO_CONNECTION.message, vm.errorMessage)
-        assertNull(vm.successState)
+        assertTrue(sh.uiState.value is MovieDetailUiState.Error)
+        assertEquals(ApiError.NO_CONNECTION.message, sh.errorMessage)
+        assertNull(sh.successState)
     }
 
     @Test
@@ -113,9 +119,9 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        assertEquals("Invalid API key.", vm.errorMessage)
+        assertEquals("Invalid API key.", sh.errorMessage)
     }
 
     @Test
@@ -125,9 +131,9 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        assertEquals("The resource you requested could not be found.", vm.errorMessage)
+        assertEquals("The resource you requested could not be found.", sh.errorMessage)
     }
 
     @Test
@@ -137,9 +143,9 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        assertEquals("Internal error: Something went wrong.", vm.errorMessage)
+        assertEquals("Internal error: Something went wrong.", sh.errorMessage)
     }
 
     @Test
@@ -149,16 +155,16 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        assertEquals(ApiError.UNEXPECTED.message, vm.errorMessage)
+        assertEquals(ApiError.UNEXPECTED.message, sh.errorMessage)
     }
 
     @Test
-    fun `missing movieId produces Error state without crashing`() = runTest {
-        val vm = MovieDetailViewModel(repository, SavedStateHandle()) // no movieId key
+    fun `null movieId produces Error state without crashing`() = runTest {
+        val sh = createStateHolder(movieId = null)
 
-        assertTrue(vm.uiState.value is MovieDetailUiState.Error)
+        assertTrue(sh.uiState.value is MovieDetailUiState.Error)
     }
 
     // ── Reload ────────────────────────────────────────────────────────────────
@@ -171,8 +177,8 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
-        vm.processIntent(MovieDetailIntent.Reload)
+        val sh = createStateHolder()
+        sh.processIntent(MovieDetailIntent.Reload)
 
         // Called twice: once on init, once on Reload
         coVerify(exactly = 2) { repository.getMovieDetail(1) }
@@ -188,8 +194,8 @@ class MovieDetailViewModelTest {
         every { repository.observeIsFavorite(1) } returns flowOf(false)
         coJustRun { repository.toggleFavorite(any()) }
 
-        val vm = createViewModel()
-        vm.processIntent(MovieDetailIntent.ToggleFavorite)
+        val sh = createStateHolder()
+        sh.processIntent(MovieDetailIntent.ToggleFavorite)
 
         coVerify { repository.toggleFavorite(any()) }
     }
@@ -201,9 +207,9 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns true
         every { repository.observeIsFavorite(1) } returns flowOf(true)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        assertTrue(vm.successState?.isFavorite == true)
+        assertTrue(sh.successState?.isFavorite == true)
     }
 
     @Test
@@ -213,9 +219,9 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(1) } returns false
         every { repository.observeIsFavorite(1) } returns flowOf(false)
 
-        val vm = createViewModel()
+        val sh = createStateHolder()
 
-        assertFalse(vm.successState?.isFavorite == true)
+        assertFalse(sh.successState?.isFavorite == true)
     }
 
     // ── Different movie IDs ───────────────────────────────────────────────────
@@ -228,9 +234,9 @@ class MovieDetailViewModelTest {
         coEvery { repository.isFavorite(5) } returns false
         every { repository.observeIsFavorite(5) } returns flowOf(false)
 
-        val vm = createViewModel(movieId = 5)
+        val sh = createStateHolder(movieId = 5)
 
-        assertEquals(5, vm.successState?.movie?.id)
+        assertEquals(5, sh.successState?.movie?.id)
         coVerify { repository.getMovieDetail(5) }
     }
 }

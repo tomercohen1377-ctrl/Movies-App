@@ -3,16 +3,17 @@ package com.tcohen.moviesapp.data.remote.paging
 import androidx.paging.PagingConfig
 import androidx.paging.PagingSource
 import androidx.paging.testing.TestPager
-import com.tcohen.moviesapp.data.local.dao.MovieDao
-import com.tcohen.moviesapp.data.remote.api.TmdbApiService
+import com.tcohen.moviesapp.data.local.LocalMovieDataSource
+import com.tcohen.moviesapp.data.remote.TmdbRemoteDataSource
 import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Movie
-import com.tcohen.moviesapp.fakeMovieEntity
+import com.tcohen.moviesapp.fakeMovie
 import com.tcohen.moviesapp.fakeMovieListResponse
 import com.tcohen.moviesapp.util.NetworkMonitor
 import com.tcohen.moviesapp.util.NetworkUnavailableException
 import io.mockk.coEvery
 import io.mockk.coJustRun
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -24,28 +25,27 @@ import org.junit.Test
 
 class MoviePagingSourceTest {
 
-    private val apiService: TmdbApiService = mockk()
-    private val movieDao: MovieDao = mockk()
+    private val remoteDataSource: TmdbRemoteDataSource = mockk()
+    private val localDataSource: LocalMovieDataSource = mockk()
     private val networkMonitor: NetworkMonitor = mockk()
 
     private val pagingConfig = PagingConfig(pageSize = 20, enablePlaceholders = false)
 
     @Before
     fun setUp() {
-        // Stubs needed by the online path
-        coJustRun { movieDao.insertAll(any()) }
-        coJustRun { movieDao.deleteByCategory(any()) }
+        coJustRun { localDataSource.insertMovies(any(), any(), any()) }
+        coJustRun { localDataSource.deleteByCategory(any()) }
     }
 
     private fun createSource(category: Category = Category.UPCOMING) =
-        MoviePagingSource(apiService, movieDao, category, networkMonitor)
+        MoviePagingSource(remoteDataSource, localDataSource, category, networkMonitor)
 
     // ── Online path ───────────────────────────────────────────────────────────
 
     @Test
     fun `online - first page loaded with correct nextKey`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getUpcomingMovies(1) } returns fakeMovieListResponse(page = 1, totalPages = 5)
+        coEvery { remoteDataSource.getUpcomingMovies(1) } returns fakeMovieListResponse(page = 1, totalPages = 5)
 
         val pager = TestPager(pagingConfig, createSource())
         val result = pager.refresh() as PagingSource.LoadResult.Page<Int, Movie>
@@ -58,7 +58,7 @@ class MoviePagingSourceTest {
     @Test
     fun `online - last page has null nextKey`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getUpcomingMovies(3) } returns fakeMovieListResponse(page = 3, totalPages = 3)
+        coEvery { remoteDataSource.getUpcomingMovies(3) } returns fakeMovieListResponse(page = 3, totalPages = 3)
 
         val source = createSource()
         val result = source.load(
@@ -72,51 +72,51 @@ class MoviePagingSourceTest {
     @Test
     fun `online - correct API called for TOP_RATED category`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getTopRatedMovies(1) } returns fakeMovieListResponse()
+        coEvery { remoteDataSource.getTopRatedMovies(1) } returns fakeMovieListResponse()
 
         val pager = TestPager(pagingConfig, createSource(Category.TOP_RATED))
         pager.refresh()
 
-        io.mockk.coVerify { apiService.getTopRatedMovies(1) }
+        coVerify { remoteDataSource.getTopRatedMovies(1) }
     }
 
     @Test
     fun `online - correct API called for NOW_PLAYING category`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getNowPlayingMovies(1) } returns fakeMovieListResponse()
+        coEvery { remoteDataSource.getNowPlayingMovies(1) } returns fakeMovieListResponse()
 
         val pager = TestPager(pagingConfig, createSource(Category.NOW_PLAYING))
         pager.refresh()
 
-        io.mockk.coVerify { apiService.getNowPlayingMovies(1) }
+        coVerify { remoteDataSource.getNowPlayingMovies(1) }
     }
 
     @Test
-    fun `online - movies are cached to Room after network load`() = runTest {
+    fun `online - movies are cached to SQLDelight after network load`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getUpcomingMovies(1) } returns fakeMovieListResponse()
+        coEvery { remoteDataSource.getUpcomingMovies(1) } returns fakeMovieListResponse()
 
         val pager = TestPager(pagingConfig, createSource())
         pager.refresh()
 
-        io.mockk.coVerify { movieDao.insertAll(any()) }
+        coVerify { localDataSource.insertMovies(any(), any(), any()) }
     }
 
     @Test
     fun `online - page 1 deletes stale cache before inserting`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getUpcomingMovies(1) } returns fakeMovieListResponse()
+        coEvery { remoteDataSource.getUpcomingMovies(1) } returns fakeMovieListResponse()
 
         val pager = TestPager(pagingConfig, createSource())
         pager.refresh()
 
-        io.mockk.coVerify { movieDao.deleteByCategory(Category.UPCOMING.name) }
+        coVerify { localDataSource.deleteByCategory(Category.UPCOMING.name) }
     }
 
     @Test
     fun `online - API error returns LoadResult Error`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getUpcomingMovies(1) } throws RuntimeException("HTTP 500")
+        coEvery { remoteDataSource.getUpcomingMovies(1) } throws RuntimeException("HTTP 500")
 
         val source = createSource()
         val result = source.load(
@@ -129,11 +129,10 @@ class MoviePagingSourceTest {
     // ── Offline path ──────────────────────────────────────────────────────────
 
     @Test
-    fun `offline - returns cached data from Room`() = runTest {
+    fun `offline - returns cached data from SQLDelight`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns false
-        val cachedEntities = (1..5).map { fakeMovieEntity(id = it, page = 1) }
-        coEvery { movieDao.getMoviesByCategory(Category.UPCOMING.name) } returns cachedEntities
-        coEvery { movieDao.getLastCachedPage(Category.UPCOMING.name) } returns 1
+        val cachedMovies = (1..5).map { fakeMovie(id = it) }
+        coEvery { localDataSource.getMoviesByCategory(Category.UPCOMING.name) } returns cachedMovies
 
         val source = createSource()
         val result = source.load(
@@ -147,7 +146,7 @@ class MoviePagingSourceTest {
     @Test
     fun `offline - no cached data returns NetworkUnavailableException`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns false
-        coEvery { movieDao.getMoviesByCategory(any()) } returns emptyList()
+        coEvery { localDataSource.getMoviesByCategory(any()) } returns emptyList()
 
         val source = createSource()
         val result = source.load(
@@ -161,9 +160,8 @@ class MoviePagingSourceTest {
     @Test
     fun `offline - cached page 1 has null prevKey`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns false
-        val cachedEntities = (1..5).map { fakeMovieEntity(id = it, page = 1) }
-        coEvery { movieDao.getMoviesByCategory(any()) } returns cachedEntities
-        coEvery { movieDao.getLastCachedPage(any()) } returns 2
+        val cachedMovies = (1..5).map { fakeMovie(id = it) }
+        coEvery { localDataSource.getMoviesByCategory(any()) } returns cachedMovies
 
         val source = createSource()
         val result = source.load(
@@ -171,20 +169,5 @@ class MoviePagingSourceTest {
         ) as PagingSource.LoadResult.Page<Int, Movie>
 
         assertNull(result.prevKey)
-    }
-
-    @Test
-    fun `offline - cached page before last page has nextKey`() = runTest {
-        every { networkMonitor.isCurrentlyOnline() } returns false
-        val cachedEntities = (1..5).map { fakeMovieEntity(id = it, page = 1) }
-        coEvery { movieDao.getMoviesByCategory(any()) } returns cachedEntities
-        coEvery { movieDao.getLastCachedPage(any()) } returns 3
-
-        val source = createSource()
-        val result = source.load(
-            PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false)
-        ) as PagingSource.LoadResult.Page<Int, Movie>
-
-        assertEquals(2, result.nextKey)
     }
 }

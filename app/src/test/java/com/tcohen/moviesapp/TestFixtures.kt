@@ -1,14 +1,11 @@
 package com.tcohen.moviesapp
 
-import com.tcohen.moviesapp.data.local.entity.FavoriteEntity
-import com.tcohen.moviesapp.data.local.entity.MovieEntity
 import com.tcohen.moviesapp.data.remote.dto.GenreResponse
 import com.tcohen.moviesapp.data.remote.dto.MovieDetailsResponse
 import com.tcohen.moviesapp.data.remote.dto.MovieResponse
 import com.tcohen.moviesapp.data.remote.dto.MovieListResponse
 import com.tcohen.moviesapp.data.remote.dto.VideoResponse
 import com.tcohen.moviesapp.data.remote.dto.VideoListResponse
-import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.domain.model.MovieDetail
@@ -115,31 +112,4 @@ fun fakeVideoListResponse(
             publishedAt = "2024-01-01T00:00:00.000Z"
         )
     ) else emptyList()
-)
-
-// ── Entities ──────────────────────────────────────────────────────────────────
-
-fun fakeMovieEntity(id: Int = 1, category: Category = Category.UPCOMING, page: Int = 1) =
-    MovieEntity(
-        id = id,
-        title = "Test Movie $id",
-        overview = "Overview $id",
-        posterPath = "/poster$id.jpg",
-        backdropPath = "/backdrop$id.jpg",
-        releaseDate = "2024-01-01",
-        voteAverage = 7.5,
-        voteCount = 1000,
-        category = category.name,
-        page = page
-    )
-
-fun fakeFavoriteEntity(id: Int = 1) = FavoriteEntity(
-    id = id,
-    title = "Test Movie $id",
-    overview = "Overview $id",
-    posterPath = "/poster$id.jpg",
-    backdropPath = "/backdrop$id.jpg",
-    releaseDate = "2024-01-01",
-    voteAverage = 7.5,
-    voteCount = 1000
 )

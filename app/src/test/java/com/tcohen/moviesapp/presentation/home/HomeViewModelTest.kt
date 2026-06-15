@@ -1,13 +1,13 @@
 package com.tcohen.moviesapp.presentation.home
 
-import androidx.paging.PagingData
 import app.cash.turbine.test
 import com.tcohen.moviesapp.domain.model.Category
-import com.tcohen.moviesapp.domain.repository.MovieRepository
 import com.tcohen.moviesapp.util.MainDispatcherRule
-import com.tcohen.moviesapp.util.NetworkMonitor
+import com.tcohen.moviesapp.util.NetworkStatusProvider
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -17,62 +17,72 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * Unit tests for [HomeStateHolder].
+ *
+ * The ViewModel is a thin wrapper; all logic lives in the shared state holder.
+ * Tests create the holder with a [CoroutineScope] backed by [MainDispatcherRule]'s
+ * [UnconfinedTestDispatcher] so coroutines run eagerly and state is immediately observable.
+ */
 class HomeViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val repository: MovieRepository = mockk()
-    private val networkMonitor: NetworkMonitor = mockk()
+    private val networkMonitor: NetworkStatusProvider = mockk()
 
-    private lateinit var viewModel: HomeViewModel
+    private lateinit var stateHolder: HomeStateHolder
+
+    private fun makeHolder(): HomeStateHolder = HomeStateHolder(
+        networkMonitor,
+        CoroutineScope(mainDispatcherRule.testDispatcher + SupervisorJob())
+    )
 
     @Before
     fun setUp() {
-        every { repository.getMovies(any()) } returns flowOf(PagingData.empty())
         every { networkMonitor.isOnline } returns flowOf(true)
-        viewModel = HomeViewModel(repository, networkMonitor)
+        stateHolder = makeHolder()
     }
 
     // ── Initial state ─────────────────────────────────────────────────────────
 
     @Test
     fun `initial selectedCategory is NOW_PLAYING`() {
-        assertEquals(Category.NOW_PLAYING, viewModel.state.value.selectedCategory)
+        assertEquals(Category.NOW_PLAYING, stateHolder.state.value.selectedCategory)
     }
 
     @Test
     fun `initial isOffline is false when network is available`() {
-        assertFalse(viewModel.state.value.isOffline)
+        assertFalse(stateHolder.state.value.isOffline)
     }
 
     // ── SelectCategory ────────────────────────────────────────────────────────
 
     @Test
     fun `SelectCategory updates selectedCategory in state`() {
-        viewModel.processIntent(HomeIntent.SelectCategory(Category.TOP_RATED))
-        assertEquals(Category.TOP_RATED, viewModel.state.value.selectedCategory)
+        stateHolder.processIntent(HomeIntent.SelectCategory(Category.TOP_RATED))
+        assertEquals(Category.TOP_RATED, stateHolder.state.value.selectedCategory)
     }
 
     @Test
     fun `SelectCategory to UPCOMING updates state correctly`() {
-        viewModel.processIntent(HomeIntent.SelectCategory(Category.UPCOMING))
-        assertEquals(Category.UPCOMING, viewModel.state.value.selectedCategory)
+        stateHolder.processIntent(HomeIntent.SelectCategory(Category.UPCOMING))
+        assertEquals(Category.UPCOMING, stateHolder.state.value.selectedCategory)
     }
 
     @Test
     fun `SelectCategory multiple times keeps last selected`() {
-        viewModel.processIntent(HomeIntent.SelectCategory(Category.TOP_RATED))
-        viewModel.processIntent(HomeIntent.SelectCategory(Category.NOW_PLAYING))
-        assertEquals(Category.NOW_PLAYING, viewModel.state.value.selectedCategory)
+        stateHolder.processIntent(HomeIntent.SelectCategory(Category.TOP_RATED))
+        stateHolder.processIntent(HomeIntent.SelectCategory(Category.NOW_PLAYING))
+        assertEquals(Category.NOW_PLAYING, stateHolder.state.value.selectedCategory)
     }
 
     // ── OpenDetail ────────────────────────────────────────────────────────────
 
     @Test
     fun `OpenDetail emits NavigateToDetail effect with correct id`() = runTest {
-        viewModel.effects.test {
-            viewModel.processIntent(HomeIntent.OpenDetail(movieId = 42))
+        stateHolder.effects.test {
+            stateHolder.processIntent(HomeIntent.OpenDetail(movieId = 42))
             val effect = awaitItem()
             assertTrue(effect is HomeEffect.NavigateToDetail)
             assertEquals(42, (effect as HomeEffect.NavigateToDetail).movieId)
@@ -82,8 +92,8 @@ class HomeViewModelTest {
 
     @Test
     fun `OpenDetail emits correct movieId for different movies`() = runTest {
-        viewModel.effects.test {
-            viewModel.processIntent(HomeIntent.OpenDetail(movieId = 99))
+        stateHolder.effects.test {
+            stateHolder.processIntent(HomeIntent.OpenDetail(movieId = 99))
             assertEquals(99, (awaitItem() as HomeEffect.NavigateToDetail).movieId)
             cancelAndIgnoreRemainingEvents()
         }
@@ -94,14 +104,14 @@ class HomeViewModelTest {
     @Test
     fun `isOffline is true when NetworkMonitor emits false`() {
         every { networkMonitor.isOnline } returns flowOf(false)
-        val vm = HomeViewModel(repository, networkMonitor)
-        assertTrue(vm.state.value.isOffline)
+        val sh = makeHolder()
+        assertTrue(sh.state.value.isOffline)
     }
 
     @Test
     fun `isOffline is false when NetworkMonitor emits true`() {
         every { networkMonitor.isOnline } returns flowOf(true)
-        val vm = HomeViewModel(repository, networkMonitor)
-        assertFalse(vm.state.value.isOffline)
+        val sh = makeHolder()
+        assertFalse(sh.state.value.isOffline)
     }
 }

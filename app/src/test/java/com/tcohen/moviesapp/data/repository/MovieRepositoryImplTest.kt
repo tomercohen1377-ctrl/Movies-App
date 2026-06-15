@@ -1,11 +1,10 @@
 package com.tcohen.moviesapp.data.repository
 
-import com.tcohen.moviesapp.data.local.dao.FavoriteDao
-import com.tcohen.moviesapp.data.local.dao.MovieDao
-import com.tcohen.moviesapp.data.remote.api.TmdbApiService
+import androidx.paging.testing.asSnapshot
+import com.tcohen.moviesapp.data.local.LocalMovieDataSource
+import com.tcohen.moviesapp.data.remote.TmdbRemoteDataSource
 import com.tcohen.moviesapp.data.remote.dto.VideoResponse
 import com.tcohen.moviesapp.domain.model.Movie
-import com.tcohen.moviesapp.fakeFavoriteEntity
 import com.tcohen.moviesapp.fakeMovie
 import com.tcohen.moviesapp.fakeMovieDetailDto
 import com.tcohen.moviesapp.fakeVideoListResponse
@@ -17,8 +16,6 @@ import io.mockk.coJustRun
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import org.junit.Assert.assertTrue
-import androidx.paging.testing.asSnapshot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -26,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -35,17 +33,13 @@ class MovieRepositoryImplTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val apiService: TmdbApiService = mockk()
-    private val movieDao: MovieDao = mockk()
-    private val favoriteDao: FavoriteDao = mockk()
+    private val remoteDataSource: TmdbRemoteDataSource = mockk()
+    private val localDataSource: LocalMovieDataSource = mockk()
     private val networkMonitor: NetworkMonitor = mockk {
         every { isCurrentlyOnline() } returns false   // server sync path disabled in unit tests
     }
     private val repository: MovieRepositoryImpl by lazy {
-        MovieRepositoryImpl(
-            apiService, movieDao, favoriteDao, networkMonitor,
-            accountId = "", sessionId = ""
-        )
+        MovieRepositoryImpl(remoteDataSource, localDataSource, networkMonitor)
     }
 
     // ── getMovieDetail ────────────────────────────────────────────────────────
@@ -53,7 +47,7 @@ class MovieRepositoryImplTest {
     @Test
     fun `getMovieDetail returns Success with mapped domain object`() = runTest {
         val dto = fakeMovieDetailDto(id = 5)
-        coEvery { apiService.getMovieDetails(5) } returns dto
+        coEvery { remoteDataSource.getMovieDetails(5) } returns dto
 
         val result = repository.getMovieDetail(5) as NetworkResult.Success
 
@@ -64,19 +58,19 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getMovieDetail returns NetworkError when API throws`() = runTest {
-        coEvery { apiService.getMovieDetails(any()) } throws java.io.IOException("connection refused")
+        coEvery { remoteDataSource.getMovieDetails(any()) } throws java.io.IOException("connection refused")
 
         val result = repository.getMovieDetail(999)
 
         assertTrue(result is NetworkResult.Error)
     }
 
-    // ── getTrailer ────────���───────────────────────────────────────────────────
+    // ── getTrailer ────────────────────────────────────────────────────────────
 
     @Test
     fun `getTrailer returns Success with YouTube trailer key when online`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getMovieVideos(1) } returns fakeVideoListResponse(trailerKey = "abc123")
+        coEvery { remoteDataSource.getMovieVideos(1) } returns fakeVideoListResponse(trailerKey = "abc123")
 
         val result = repository.getTrailer(1) as NetworkResult.Success
 
@@ -96,7 +90,7 @@ class MovieRepositoryImplTest {
     @Test
     fun `getTrailer returns Success with null when no YouTube trailers exist`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getMovieVideos(1) } returns fakeVideoListResponse(trailerKey = null)
+        coEvery { remoteDataSource.getMovieVideos(1) } returns fakeVideoListResponse(trailerKey = null)
 
         val result = repository.getTrailer(1) as NetworkResult.Success
 
@@ -120,7 +114,7 @@ class MovieRepositoryImplTest {
                 )
             )
         )
-        coEvery { apiService.getMovieVideos(1) } returns response
+        coEvery { remoteDataSource.getMovieVideos(1) } returns response
 
         val result = (repository.getTrailer(1) as NetworkResult.Success).data
 
@@ -139,7 +133,7 @@ class MovieRepositoryImplTest {
                 )
             )
         )
-        coEvery { apiService.getMovieVideos(1) } returns response
+        coEvery { remoteDataSource.getMovieVideos(1) } returns response
 
         val result = (repository.getTrailer(1) as NetworkResult.Success).data
 
@@ -151,37 +145,35 @@ class MovieRepositoryImplTest {
     @Test
     fun `toggleFavorite inserts when movie is not already favorited`() = runTest {
         val movie = fakeMovie(id = 3)
-        coEvery { favoriteDao.isFavorite(3) } returns false
-        coJustRun { favoriteDao.insert(any()) }
+        coEvery { localDataSource.isFavorite(3) } returns false
+        coJustRun { localDataSource.insertFavorite(any(), any()) }
 
         repository.toggleFavorite(movie)
 
-        coVerify { favoriteDao.insert(any()) }
+        coVerify { localDataSource.insertFavorite(any(), any()) }
     }
 
     @Test
     fun `toggleFavorite deletes when movie is already favorited`() = runTest {
         val movie = fakeMovie(id = 4)
-        coEvery { favoriteDao.isFavorite(4) } returns true
-        coJustRun { favoriteDao.deleteById(4) }
+        coEvery { localDataSource.isFavorite(4) } returns true
+        coJustRun { localDataSource.deleteFavoriteById(4) }
 
         repository.toggleFavorite(movie)
 
-        coVerify { favoriteDao.deleteById(4) }
+        coVerify { localDataSource.deleteFavoriteById(4) }
     }
 
     // ── getFavorites (paging) ─────────────────────────────────────────────────
 
     @Test
-    fun `getFavorites returns paged items from Room when offline`() = runTest {
+    fun `getFavorites returns paged items from cache when offline`() = runTest {
         // networkMonitor already returns false (offline) in this test class.
-        val entities = listOf(fakeFavoriteEntity(1), fakeFavoriteEntity(2))
-        // FavoritesPagingSource fetches FAVORITES_PAGE_SIZE + 1 rows to detect next page.
-        coEvery { favoriteDao.getFavoritesPaged(any(), 0) } returns entities
-        coEvery { favoriteDao.getFavoritesPaged(any(), 20) } returns emptyList()
+        val movies = listOf(fakeMovie(1), fakeMovie(2))
+        coEvery { localDataSource.getFavoritesPaged(any(), 0) } returns movies
+        coEvery { localDataSource.getFavoritesPaged(any(), 20) } returns emptyList()
 
-        val snapshot = repository.getFavorites()
-            .asSnapshot()
+        val snapshot = repository.getFavorites().asSnapshot()
 
         assertEquals(2, snapshot.size)
         assertEquals(1, snapshot[0].id)
@@ -190,19 +182,18 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getFavorites returns empty snapshot when no cached favorites`() = runTest {
-        coEvery { favoriteDao.getFavoritesPaged(any(), any()) } returns emptyList()
+        coEvery { localDataSource.getFavoritesPaged(any(), any()) } returns emptyList()
 
-        val snapshot = repository.getFavorites()
-            .asSnapshot()
+        val snapshot = repository.getFavorites().asSnapshot()
 
         assertEquals(emptyList<Movie>(), snapshot)
     }
 
-    // ── isFavorite ────────────────────────────────────────────────────────────
+    // ── observeIsFavorite ─────────────────────────────────────────────────────
 
     @Test
-    fun `isFavorite returns true when movie is favorited`() = runTest {
-        every { favoriteDao.observeIsFavorite(5) } returns flowOf(true)
+    fun `observeIsFavorite returns true when movie is favorited`() = runTest {
+        every { localDataSource.observeIsFavorite(5) } returns flowOf(true)
 
         val result = repository.observeIsFavorite(5).first()
 
@@ -210,8 +201,8 @@ class MovieRepositoryImplTest {
     }
 
     @Test
-    fun `isFavorite returns false when movie is not favorited`() = runTest {
-        every { favoriteDao.observeIsFavorite(5) } returns flowOf(false)
+    fun `observeIsFavorite returns false when movie is not favorited`() = runTest {
+        every { localDataSource.observeIsFavorite(5) } returns flowOf(false)
 
         val result = repository.observeIsFavorite(5).first()
 

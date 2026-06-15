@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "MoviesApp"
 include(":app")
+include(":shared")
