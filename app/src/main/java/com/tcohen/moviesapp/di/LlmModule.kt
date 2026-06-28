@@ -5,6 +5,8 @@ import com.tcohen.moviesapp.ai.data.local.cache.InMemoryLlmResponseCache
 import com.tcohen.moviesapp.ai.data.local.cache.LlmResponseCache
 import com.tcohen.moviesapp.ai.data.remote.client.OpenAiCompatibleLlmClient
 import com.tcohen.moviesapp.ai.data.remote.interceptor.LlmAuthInterceptor
+import com.tcohen.moviesapp.ai.data.repository.SystemTimeProvider
+import com.tcohen.moviesapp.ai.data.repository.TimeProvider
 import com.tcohen.moviesapp.ai.domain.client.LlmClient
 import dagger.Binds
 import dagger.Module
@@ -52,6 +54,11 @@ object LlmModule {
     @Provides
     @Singleton
     fun provideLlmResponseCache(): LlmResponseCache = InMemoryLlmResponseCache()
+
+    /** Phase 2: wall-clock provider for token-usage ledger; tests override this. */
+    @Provides
+    @Singleton
+    fun provideTimeProvider(): TimeProvider = SystemTimeProvider
 }
 
 /**

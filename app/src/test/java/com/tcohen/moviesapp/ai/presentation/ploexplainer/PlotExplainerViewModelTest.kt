@@ -151,6 +151,33 @@ class PlotExplainerViewModelTest {
         // (A success-on-retry case is covered by Streaming-once tests.)
     }
 
+    // ── Phase 2: daily token cap ──────────────────────────────────────────────
+
+    @Test
+    fun `Explain never streams when daily cap is exhausted`() = runTest {
+        val tracker = FakeAiUsageTracker().also {
+            // Seed enough tokens to push the day over the cap so
+            // guardUnderDailyCap() returns Error.
+            it.seedUsedTokens(
+                inputTokens = 250_001,
+                outputTokens = 0
+            )
+        }
+        val (vm, client) = createViewModel(
+            script = flowOf(NetworkResult.Success("never streamed") as NetworkResult<String>),
+            usageTracker = tracker
+        )
+
+        vm.processIntent(PlotExplainerIntent.Explain(SAMPLE_TITLE, SAMPLE_YEAR, SAMPLE_RUNTIME))
+
+        assertEquals(
+            "no streaming should occur when the daily cap is over",
+            0, client.streamCalls.size
+        )
+        val finalState = vm.state.value
+        assertTrue("expected Error but was $finalState", finalState is PlotExplainerState.Error)
+    }
+
     // ── Cancel and reset ──────────────────────────────────────────────────────
 
     @Test
@@ -196,11 +223,16 @@ class PlotExplainerViewModelTest {
 
     private fun createViewModel(
         script: Flow<NetworkResult<String>> = flowOf(),
-        scriptByCall: List<Flow<NetworkResult<String>>> = emptyList()
+        scriptByCall: List<Flow<NetworkResult<String>>> = emptyList(),
+        usageTracker: FakeAiUsageTracker = FakeAiUsageTracker()
     ): Pair<PlotExplainerViewModel, ScriptedLlmClient> {
         val client = ScriptedLlmClient(script, scriptByCall)
         val cache: LlmResponseCache = InMemoryLlmResponseCache()
-        return PlotExplainerViewModel(llmClient = client, responseCache = cache) to client
+        return PlotExplainerViewModel(
+            llmClient = client,
+            responseCache = cache,
+            usageRepository = usageTracker.asRepository
+        ) to client
     }
 
     private fun emptyFlow() = flowOf<NetworkResult<String>>()
@@ -230,5 +262,61 @@ private class ScriptedLlmClient(
         streamCalls.add(request)
         val index = streamCalls.size - 1
         return if (index in scriptsByCall.indices) scriptsByCall[index] else defaultScript
+    }
+}
+
+/**
+ * In-memory stand-in for `AiUsageRepositoryImpl`. Holds a fake DAO and exposes
+ * a `.asRepository` property of the right concrete type — the production VM
+ * constructor is typed against `AiUsageRepositoryImpl` (with `@Inject`),
+ * so we hand it the wrapped instance.
+ */
+internal class FakeAiUsageTracker {
+    private val fakeDao = FakeAiUsageDao()
+
+    val asRepository: com.tcohen.moviesapp.ai.data.repository.AiUsageRepositoryImpl =
+        com.tcohen.moviesapp.ai.data.repository.AiUsageRepositoryImpl(
+            dao = fakeDao,
+            clock = object : com.tcohen.moviesapp.ai.data.repository.TimeProvider {
+                override fun startOfTodayMillis(): Long = 0L  // epoch start → everything is "today"
+            }
+        )
+
+    /** Pre-load usage rows as if the user already burned through today. */
+    fun seedUsedTokens(inputTokens: Int, outputTokens: Int) {
+        fakeDao.seedUsedTokens(inputTokens, outputTokens)
+    }
+}
+
+/**
+ * In-memory [AiUsageDao] used by [FakeAiUsageTracker].
+ */
+private class FakeAiUsageDao : com.tcohen.moviesapp.ai.data.local.dao.AiUsageDao {
+    private val entries = mutableListOf<com.tcohen.moviesapp.ai.data.local.entity.AiUsageEntity>()
+
+    override suspend fun insert(usage: com.tcohen.moviesapp.ai.data.local.entity.AiUsageEntity) {
+        entries += usage
+    }
+
+    override suspend fun totalTokensSince(sinceMillis: Long): Int =
+        entries.filter { it.timestamp >= sinceMillis }
+            .sumOf { it.inputTokens + it.outputTokens }
+
+    override suspend fun inputTokensSince(sinceMillis: Long): Int =
+        entries.filter { it.timestamp >= sinceMillis }.sumOf { it.inputTokens }
+
+    override suspend fun outputTokensSince(sinceMillis: Long): Int =
+        entries.filter { it.timestamp >= sinceMillis }.sumOf { it.outputTokens }
+
+    override suspend fun deleteOlderThan(beforeMillis: Long) {
+        entries.removeAll { it.timestamp < beforeMillis }
+    }
+
+    fun seedUsedTokens(inputTokens: Int, outputTokens: Int) {
+        entries += com.tcohen.moviesapp.ai.data.local.entity.AiUsageEntity(
+            model = "test", feature = "test",
+            inputTokens = inputTokens, outputTokens = outputTokens,
+            timestamp = 0L  // at "today start" → counts toward today
+        )
     }
 }

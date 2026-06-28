@@ -30,14 +30,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.tcohen.moviesapp.ai.data.local.cache.InMemoryLlmResponseCache
-import com.tcohen.moviesapp.ai.domain.client.LlmClient
-import com.tcohen.moviesapp.ai.domain.model.ChatCompletion
-import com.tcohen.moviesapp.ai.domain.model.ChatRequest
-import com.tcohen.moviesapp.ai.domain.model.FinishReason
 import com.tcohen.moviesapp.presentation.common.ErrorView
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
-import com.tcohen.moviesapp.util.NetworkResult
 
 /**
  * Streaming plot-summary section embedded at the bottom of
@@ -289,25 +283,4 @@ private fun PlotExplainerContentErrorPreview() {
             onRetry = {}
         )
     }
-}
-
-/**
- * Kept around for Hilt parity — currently unused because [PlotExplainerContent]
- * is stateless and can drive every preview without a ViewModel. Removed in a
- * later phase if no caller materialises.
- */
-@Suppress("unused")
-private fun silentPreviewViewModel(): PlotExplainerViewModel {
-    val noOpClient = object : LlmClient {
-        override suspend fun complete(request: ChatRequest): NetworkResult<ChatCompletion> =
-            NetworkResult.Success(
-                ChatCompletion(text = "", toolCalls = emptyList(), finishReason = FinishReason.STOP)
-            )
-        override fun stream(request: ChatRequest): kotlinx.coroutines.flow.Flow<NetworkResult<String>> =
-            kotlinx.coroutines.flow.emptyFlow()
-    }
-    return PlotExplainerViewModel(
-        llmClient = noOpClient,
-        responseCache = InMemoryLlmResponseCache()
-    )
 }

@@ -40,7 +40,8 @@ import javax.inject.Inject
 @HiltViewModel
 class PlotExplainerViewModel @Inject constructor(
     private val llmClient: LlmClient,
-    private val responseCache: LlmResponseCache
+    private val responseCache: LlmResponseCache,
+    private val usageRepository: com.tcohen.moviesapp.ai.data.repository.AiUsageRepositoryImpl
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<PlotExplainerState>(PlotExplainerState.Idle)
@@ -76,7 +77,28 @@ class PlotExplainerViewModel @Inject constructor(
                 return@launch
             }
 
-            runStreaming(request)
+            // Phase 2: pre-flight daily-cap check. If the user has burned
+            // their daily budget, surface a clear error *before* we hit
+            // the provider (which would 429 anyway). Skipped when the
+            // answer is already cached above.
+            when (val cap = usageRepository.guardUnderDailyCap()) {
+                is NetworkResult.Error -> {
+                    _state.value = PlotExplainerState.Error(cap.message)
+                    return@launch
+                }
+                is NetworkResult.Success -> Unit
+            }
+
+            val completion = runStreaming(request) ?: return@launch
+
+            // Phase 2: record usage. Tokens are estimated from text length
+            // until Phase 6 wires real token counts from the LLM provider.
+            usageRepository.recordUsage(
+                model = request.model.ifEmpty { LLM_MODEL_DEFAULT },
+                feature = LLM_FEATURE_NAME,
+                inputTokens = estimateInputTokens(request),
+                outputTokens = estimateOutputTokens(completion.text)
+            )
         }
     }
 
@@ -99,7 +121,11 @@ class PlotExplainerViewModel @Inject constructor(
 
     // ── Streaming pipeline ────────────────────────────────────────────────────
 
-    private suspend fun runStreaming(request: ChatRequest) {
+    /**
+     * Returns the [ChatCompletion] if the stream finished successfully, or
+     * `null` on error (caller short-circuits the post-call bookkeeping).
+     */
+    private suspend fun runStreaming(request: ChatRequest): ChatCompletion? {
         _state.value = PlotExplainerState.Streaming("")
         val collected = StringBuilder()
         var errored: NetworkResult.Error? = null
@@ -116,22 +142,22 @@ class PlotExplainerViewModel @Inject constructor(
 
         if (errored != null) {
             _state.value = PlotExplainerState.Error(errored.message)
-            return
+            return null
         }
 
         val finalText = collected.toString()
-        // Write through to the cache so the next tap on the same movie
-        // pays nothing — second-click cache hit is asserted by unit tests.
+        val completion = ChatCompletion(
+            text = finalText,
+            toolCalls = emptyList(),
+            finishReason = FinishReason.STOP
+        )
         responseCache.put(
             request = request,
             promptVersion = PlotExplainerPrompt.CACHE_VERSION,
-            completion = ChatCompletion(
-                text = finalText,
-                toolCalls = emptyList(),
-                finishReason = FinishReason.STOP
-            )
+            completion = completion
         )
         _state.value = PlotExplainerState.Done(finalText)
+        return completion
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -158,5 +184,39 @@ class PlotExplainerViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         streamingJob?.cancel()
+    }
+
+    // ── Token-count estimation ─────────────────────────────────────────────
+    //
+    // Phase 2: we don't have real provider-reported token counts yet
+    // (those arrive in Phase 6 when we wire `stream_options.include_usage`).
+    // Until then, estimate via the standard "4 chars ≈ 1 token" rule.
+
+    /** Char-length / 4 heuristic; rounded up so even tiny responses count ≥1. */
+    private fun estimateOutputTokens(text: String): Int =
+        (text.length + OUTPUT_TOKEN_OVERHEAD_CHARS) / OUTPUT_TOKEN_CHARS_PER_TOKEN
+
+    /**
+     * Input tokens are the rendered prompt's length. We add a system margin
+     * to account for chat-format framing overhead (provider-specific but
+     * bounded; ~3 tokens is a safe upper bound for our use).
+     */
+    private fun estimateInputTokens(request: ChatRequest): Int {
+        val promptChars = request.messages.sumOf { it.text.length }
+        return (promptChars + INPUT_TOKEN_OVERHEAD_CHARS) / INPUT_TOKEN_CHARS_PER_TOKEN
+    }
+
+    private companion object {
+        /** Stable name for this feature so usage can be grouped in reports. */
+        const val LLM_FEATURE_NAME: String = "plot-explainer"
+
+        /** Fallback model name used when the request didn't override it. */
+        const val LLM_MODEL_DEFAULT: String = "gemini-2.5-flash"
+
+        const val OUTPUT_TOKEN_CHARS_PER_TOKEN: Int = 4
+        const val OUTPUT_TOKEN_OVERHEAD_CHARS: Int = 4
+
+        const val INPUT_TOKEN_CHARS_PER_TOKEN: Int = 4
+        const val INPUT_TOKEN_OVERHEAD_CHARS: Int = 12
     }
 }

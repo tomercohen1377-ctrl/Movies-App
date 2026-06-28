@@ -3,6 +3,7 @@ package com.tcohen.moviesapp.di
 import android.content.Context
 import androidx.room.Room
 import com.tcohen.moviesapp.data.local.AppDatabase
+import com.tcohen.moviesapp.ai.data.local.dao.AiUsageDao
 import com.tcohen.moviesapp.data.local.dao.FavoriteDao
 import com.tcohen.moviesapp.data.local.dao.MovieDao
 import dagger.Module
@@ -23,7 +24,11 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             AppDatabase.DATABASE_NAME
-        ).build()
+        )
+            // Phase 2: v1 → v2 adds the ai_usage ledger without disturbing
+            // existing favorites / cached movies data.
+            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides
@@ -31,4 +36,8 @@ object DatabaseModule {
 
     @Provides
     fun provideFavoriteDao(database: AppDatabase): FavoriteDao = database.favoriteDao()
+
+    /** Phase 2: ledger for token-usage tracking + daily-cap enforcement. */
+    @Provides
+    fun provideAiUsageDao(database: AppDatabase): AiUsageDao = database.aiUsageDao()
 }
