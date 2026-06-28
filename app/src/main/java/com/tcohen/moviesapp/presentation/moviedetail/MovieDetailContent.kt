@@ -12,6 +12,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.tcohen.moviesapp.ai.presentation.ploexplainer.PlotExplainerSection
 import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.domain.model.MovieDetail
 import com.tcohen.moviesapp.presentation.common.TrailerPlayerSection
@@ -20,8 +21,9 @@ import com.tcohen.moviesapp.util.TmdbImageUrl
 
 /**
  * Scrollable body of the movie detail screen — trailer/backdrop at the top followed by
- * [MovieMetadata]. Extracted so it can be rendered behind the loading overlay while the
- * YouTube player warms up, without cluttering [MovieDetailScreen].
+ * [MovieMetadata] and the AI plot-explainer [PlotExplainerSection]. Extracted so it can
+ * be rendered behind the loading overlay while the YouTube player warms up, without
+ * cluttering [MovieDetailScreen].
  *
  * @param uiState The [MovieDetailUiState.Success] to render.
  * @param onPlayerReady Callback fired once the YouTube player has initialised.
@@ -55,10 +57,25 @@ fun MovieDetailContent(
         // All textual and visual metadata
         MovieMetadata(movie = uiState.movie)
 
+        // Phase 0+ — AI plot summary section. Owns its own ViewModel and
+        // state machine; the surrounding `MovieDetailViewModel` is unaware
+        // of it (separation of concerns).
+        val releaseYear = uiState.movie.releaseDate
+            .take(RELEASE_YEAR_CHAR_COUNT)
+            .toIntOrNull()
+        PlotExplainerSection(
+            title = uiState.movie.title,
+            year = releaseYear,
+            runtimeMinutes = uiState.movie.runtime,
+        )
+
         // Bottom spacer so the FAB doesn't overlap the last line of text
         Spacer(modifier = Modifier.height(88.dp))
     }
 }
+
+/** Number of leading characters in `Movie.releaseDate` that form the 4-digit year. */
+private const val RELEASE_YEAR_CHAR_COUNT = 4
 
 @Preview(showBackground = true)
 @Composable

@@ -10,8 +10,9 @@ class ApiErrorTest {
     // ── enum entries ──────────────────────────────────────────────────────────
 
     @Test
-    fun `ApiError has 4 entries`() {
-        assertEquals(4, ApiError.entries.size)
+    fun `ApiError has 8 entries (4 TMDB + 4 LLM)`() {
+        // 4 pre-existing TMDB entries, 4 LLM entries added in Phase 0.
+        assertEquals(8, ApiError.entries.size)
     }
 
     @Test
@@ -27,7 +28,7 @@ class ApiErrorTest {
         assertEquals(messages.size, messages.toSet().size)
     }
 
-    // ── specific message content ──────────────────────────────────────────────
+    // ── TMDB / generic message content ────────────────────────────────────────
 
     @Test
     fun `NO_CONNECTION message mentions internet`() {
@@ -45,6 +46,40 @@ class ApiErrorTest {
         assertTrue(ApiError.UNEXPECTED.message.contains("unexpected", ignoreCase = true))
     }
 
+    // ── LLM-specific message content (Phase 0) ───────────────────────────────
+
+    @Test
+    fun `UNAUTHORIZED message mentions auth or api key`() {
+        val msg = ApiError.UNAUTHORIZED.message.lowercase()
+        assertTrue(
+            "UNAUTHORIZED should hint at credential problem, was: '${ApiError.UNAUTHORIZED.message}'",
+            msg.contains("auth") || msg.contains("api key") || msg.contains("key")
+        )
+    }
+
+    @Test
+    fun `RATE_LIMITED message mentions slowing down`() {
+        val msg = ApiError.RATE_LIMITED.message.lowercase()
+        assertTrue(
+            "RATE_LIMITED should hint at throttling, was: '${ApiError.RATE_LIMITED.message}'",
+            msg.contains("slow") || msg.contains("too many") || msg.contains("rate")
+        )
+    }
+
+    @Test
+    fun `LLM_UNAVAILABLE message mentions unavailability`() {
+        assertTrue(ApiError.LLM_UNAVAILABLE.message.contains("unavailable", ignoreCase = true))
+    }
+
+    @Test
+    fun `CONTEXT_TOO_LONG message mentions length`() {
+        val msg = ApiError.CONTEXT_TOO_LONG.message.lowercase()
+        assertTrue(
+            "CONTEXT_TOO_LONG should hint at length, was: '${ApiError.CONTEXT_TOO_LONG.message}'",
+            msg.contains("long") || msg.contains("length") || msg.contains("context")
+        )
+    }
+
     // ── NetworkResult.Error integration ──────────────────────────────────────
 
     @Test
@@ -58,5 +93,13 @@ class ApiErrorTest {
         val errorA = NetworkResult.Error(ApiError.NO_CONNECTION.message)
         val errorB = NetworkResult.Error(ApiError.TIMEOUT.message)
         assertNotEquals(errorA.message, errorB.message)
+    }
+
+    @Test
+    fun `LLM UNAUTHORIZED and RATE_LIMITED are not interchangeable`() {
+        assertNotEquals(
+            NetworkResult.Error(ApiError.UNAUTHORIZED.message).message,
+            NetworkResult.Error(ApiError.RATE_LIMITED.message).message
+        )
     }
 }

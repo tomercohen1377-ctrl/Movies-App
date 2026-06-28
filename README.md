@@ -22,6 +22,8 @@ A production-quality Android application that browses movies using [The Movie Da
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+  - [Optional: TMDB Account Sync](#optional-tmdb-account-sync)
+  - [Optional: AI Features (Phase 0+)](#optional-ai-features-phase-0)
 - [Caching Strategy](#caching-strategy)
 - [Offline Behaviour](#offline-behaviour)
 - [Error Handling](#error-handling)
@@ -168,6 +170,31 @@ buildConfigField("String", "TMDB_SESSION_ID", "\"your_session_id\"")  // v3 sess
 ```
 
 Without these, favorites are still fully functional — changes are saved locally in Room and a best-effort sync is attempted using the Bearer token.
+
+### Optional: AI Features (Phase 0+)
+
+Phase 0 adds an `LlmClient` powered by Google's Gemini free tier. **Unlike TMDB, the AI credentials are intentionally NOT committed to source** — they're tied to your personal Google account and rate-limited per-key, so publishing them would burn your quota and risk the key being abused. The committed value is an empty placeholder:
+
+```kotlin
+// app/build.gradle.kts
+buildConfigField("String", "GEMINI_API_KEY", "\"\"")  // ← drop your key here
+```
+
+**To exercise the AI features (30 seconds):**
+
+1. Get a free Gemini API key at **https://aistudio.google.com/app/apikey** — sign in with any Google account, click *Create API key*, copy the result.
+2. Paste it into the `GEMINI_API_KEY` `buildConfigField` above (between the inner quotes).
+3. Sync Gradle and rebuild.
+
+Free-tier limits are generous for personal use: **15 requests/min, ~1M tokens/min, 1,500 requests/day**. See [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md) for the full setup, the
+swappable-provider pattern, and the prompt-versioning strategy used by the
+response cache.
+
+**Without a key, the app builds and runs identically** — every screen, every test, the existing 188-test green status. Only feature-touching LLM calls fail fast with
+`NetworkResult.Error(ApiError.UNAUTHORIZED.message)` and a clear message in the
+UI ("Couldn't authenticate with the AI provider — check your API key"). The
+TMDB paths, paging flows, favorites sync, image caching, and offline behaviour
+all continue to work exactly as before.
 
 ---
 

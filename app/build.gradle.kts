@@ -35,6 +35,14 @@ android {
         //   GET /authentication/token/new → authorize → POST /authentication/session/new
         buildConfigField("String", "TMDB_ACCOUNT_ID", "\"me\"")
         buildConfigField("String", "TMDB_SESSION_ID", "\"\"")
+
+        // Phase 0 — AI/LLM provider. Empty by default; drop in your Gemini key
+        // from https://aistudio.google.com to enable. Without a key, every
+        // LLM call fails fast with ApiError.UNAUTHORIZED and the rest of the
+        // app continues to work normally.
+        buildConfigField("String", "GEMINI_API_KEY", "\"\"")
+        buildConfigField("String", "LLM_BASE_URL", "\"https://generativelanguage.googleapis.com/v1beta/openai/\"")
+        buildConfigField("String", "LLM_DEFAULT_MODEL", "\"gemini-2.5-flash\"")
     }
 
     buildTypes {
