@@ -9,6 +9,7 @@ A production-quality Android application that browses movies using [The Movie Da
 <p float="left">
   <img src="assets/home.png" width="300" />
   <img src="assets/details.png" width="300" />
+  <img src="assets/ai-plot-summary.png" width="300" />
   <img src="assets/favorites.png" width="300" />
   <img src="assets/offline.png" width="300" />
 </p>
@@ -18,6 +19,7 @@ A production-quality Android application that browses movies using [The Movie Da
 ## Table of Contents
 
 - [Features](#features)
+- [AI Plot Summary](#ai-plot-summary)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
@@ -50,6 +52,49 @@ A production-quality Android application that browses movies using [The Movie Da
 | **Image caching — 1-day TTL** | Coil DiskCache (100 MB) + `Cache-Control: max-age=86400`; images served from disk up to 24 hours |
 | **Offline image serving** | Images cached on disk are served immediately without any network request |
 | **Typed error handling** | `NetworkResult<T>` sealed class; HTTP error messages come from TMDB's `status_message` body; connectivity errors mapped to `ApiError` enum entries |
+| **AI plot summary** | On the detail screen, generate a short LLM-written plot summary from the movie's overview; cached & rerunnable via Reset — see [AI Plot Summary](#ai-plot-summary) |
+
+---
+
+## AI Plot Summary
+
+![AI plot summary on the detail screen](assets/ai-plot-summary.png)
+
+After opening a movie, the detail screen shows the standard TMDB metadata block
+followed by a new **AI plot summary** card. Tapping the card sends the movie's
+`title` + `overview` to the configured LLM (`gemini-2.0-flash` by default) with
+a `plot-v1`-versioned prompt, and renders a 2–3 sentence rewrite in the same
+voice as the original tagline.
+
+### How it works
+
+- **Lazy, on-demand** — the summary is only fetched when you tap the card; it
+  does not run on every detail-screen open.
+- **Cached** — the response is stored in `LlmResponseCache`, keyed by
+  `sha256(prompt_version + model + temperature + max_tokens + messages)`.
+  Repeated taps for the same movie hit the cache instead of burning quota.
+- **Reset** — the *Reset* button on the card wipes the cached entry and
+  triggers a fresh request, useful when you want to verify cache invalidation.
+- **Provider-agnostic** — the underlying `LlmClient` is transport-agnostic;
+  swap Gemini for Groq / OpenRouter / OpenAI by changing two
+  `buildConfigField` values, no Kotlin edits required.
+- **Graceful degradation** — without a `GEMINI_API_KEY` in `build.gradle.kts`
+  the card shows a friendly *"Couldn't authenticate with the AI provider —
+  check your API key"* inline; the rest of the screen and every other feature
+  keeps working.
+
+### Enabling the feature
+
+The feature is gated only by the API key. Set:
+
+```kotlin
+// app/build.gradle.kts
+buildConfigField("String", "GEMINI_API_KEY", "\"AIza…\"")
+```
+
+…and re-sync Gradle. Free-tier Gemini is generous (15 req/min, ~1M tokens/min,
+1,500 req/day); a full setup guide, the cache-key strategy, and the
+swappable-provider pattern live in [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md).
 
 ---
 
