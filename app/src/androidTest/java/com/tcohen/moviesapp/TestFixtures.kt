@@ -7,7 +7,7 @@ import com.tcohen.moviesapp.domain.model.MovieDetail
 fun fakeMovie(
     id: Int = 1,
     title: String = "Test Movie $id",
-    posterPath: String? = null,     // null → no network needed in UI tests
+    posterPath: String? = null,
     backdropPath: String? = null,
     voteAverage: Double = 7.5,
     releaseDate: String = "2024-01-01"

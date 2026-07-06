@@ -6,8 +6,6 @@ import org.junit.Test
 
 class TmdbImageUrlTest {
 
-    // ── poster (w342) ─────────────────────────────────────────────────────────
-
     @Test
     fun `poster returns null for null path`() {
         assertNull(TmdbImageUrl.poster(null))
@@ -27,8 +25,6 @@ class TmdbImageUrlTest {
         assertEquals("https://image.tmdb.org/t/p/w342/poster123.jpg", url)
     }
 
-    // ── posterLarge (w500) ────────────────────────────────────────────────────
-
     @Test
     fun `posterLarge returns null for null path`() {
         assertNull(TmdbImageUrl.posterLarge(null))
@@ -41,8 +37,6 @@ class TmdbImageUrlTest {
             TmdbImageUrl.posterLarge("/abc.jpg")
         )
     }
-
-    // ── backdrop (w780) ───────────────────────────────────────────────────────
 
     @Test
     fun `backdrop returns null for null path`() {
@@ -61,12 +55,10 @@ class TmdbImageUrlTest {
     fun `backdrop is wider than poster`() {
         val backdropUrl = TmdbImageUrl.backdrop("/img.jpg") ?: ""
         val posterUrl = TmdbImageUrl.poster("/img.jpg") ?: ""
-        // w780 vs w342 — backdrop URL should contain the wider size
+
         assert(backdropUrl.contains("w780"))
         assert(posterUrl.contains("w342"))
     }
-
-    // ── consistent base URL ───────────────────────────────────────────────────
 
     @Test
     fun `all sizes share the same base domain`() {

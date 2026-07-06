@@ -17,8 +17,6 @@ class MovieMetadataTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    // ── Title ─────────────────────────────────────────────────────────────────
-
     @Test
     fun movieMetadata_displaysTitle() {
         composeTestRule.setContent {
@@ -30,8 +28,6 @@ class MovieMetadataTest {
         composeTestRule.onNodeWithText("Interstellar").assertIsDisplayed()
     }
 
-    // ── Release year ──────────────────────────────────────────────────────────
-
     @Test
     fun movieMetadata_displaysReleaseYear() {
         val movie = fakeMovieDetail().copy(releaseDate = "2023-11-22")
@@ -41,11 +37,8 @@ class MovieMetadataTest {
             }
         }
 
-        // Only the first 4 chars (year) are shown
         composeTestRule.onNodeWithText("2023").assertIsDisplayed()
     }
-
-    // ── Runtime ───────────────────────────────────────────────────────────────
 
     @Test
     fun movieMetadata_displaysRuntimeWithSuffix() {
@@ -71,8 +64,6 @@ class MovieMetadataTest {
         composeTestRule.onNodeWithText("m", substring = true).assertDoesNotExist()
     }
 
-    // ── Genre chips ───────────────────────────────────────────────────────────
-
     @Test
     fun movieMetadata_displaysGenreChips() {
         val movie = fakeMovieDetail(
@@ -97,11 +88,8 @@ class MovieMetadataTest {
             }
         }
 
-        // Should not crash and genre-specific text won't exist
         composeTestRule.onNodeWithText("Action").assertDoesNotExist()
     }
-
-    // ── Tagline ───────────────────────────────────────────────────────────────
 
     @Test
     fun movieMetadata_displaysTaglineInQuotes() {
@@ -139,8 +127,6 @@ class MovieMetadataTest {
         composeTestRule.onNodeWithText("\"", substring = true).assertDoesNotExist()
     }
 
-    // ── Overview ──────────────────────────────────────────────────────────────
-
     @Test
     fun movieMetadata_displaysOverview() {
         val movie = fakeMovieDetail().copy(overview = "A story about space exploration.")
@@ -152,8 +138,6 @@ class MovieMetadataTest {
 
         composeTestRule.onNodeWithText("A story about space exploration.").assertIsDisplayed()
     }
-
-    // ── Rating ────────────────────────────────────────────────────────────────
 
     @Test
     fun movieMetadata_displaysRatingBadge() {
@@ -167,5 +151,3 @@ class MovieMetadataTest {
         composeTestRule.onNodeWithText("9.1").assertIsDisplayed()
     }
 }
-
-

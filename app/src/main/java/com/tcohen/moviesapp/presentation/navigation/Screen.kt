@@ -3,9 +3,6 @@ package com.tcohen.moviesapp.presentation.navigation
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
-/**
- * Sealed class representing every navigable destination in the app.
- */
 sealed class Screen(val route: String) {
 
     data object Home : Screen("home")

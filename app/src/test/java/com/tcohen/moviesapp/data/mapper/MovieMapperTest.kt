@@ -6,15 +6,12 @@ import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.fakeMovieDetailDto
 import com.tcohen.moviesapp.fakeMovieDto
 import com.tcohen.moviesapp.fakeMovieEntity
-import com.tcohen.moviesapp.fakeFavoriteEntity
 import com.tcohen.moviesapp.fakeMovie
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class MovieMapperTest {
-
-    // ── MovieResponse → Movie ─────────────────────────────────────��────────────────
 
     @Test
     fun `MovieDto toDomain maps all fields correctly`() {
@@ -44,8 +41,6 @@ class MovieMapperTest {
         val domain = dto.toDomain()
         assertNull(domain.backdropPath)
     }
-
-    // ── MovieDetailDto → MovieDetail ──────────────────────────────────────────
 
     @Test
     fun `MovieDetailDto toDomain maps all fields correctly`() {
@@ -86,8 +81,6 @@ class MovieMapperTest {
         assertEquals("Adventure", domain.genres[1].name)
     }
 
-    // ── GenreResponse → GenreResponse ──────────────────────────────────────────────────────
-
     @Test
     fun `GenreDto toDomain maps id and name`() {
         val dto = GenreResponse(id = 99, name = "Sci-Fi")
@@ -95,8 +88,6 @@ class MovieMapperTest {
         assertEquals(99, domain.id)
         assertEquals("Sci-Fi", domain.name)
     }
-
-    // ── MovieEntity → Movie ───────────────────────────────────────────────────
 
     @Test
     fun `MovieEntity toDomain maps all fields correctly`() {
@@ -108,20 +99,6 @@ class MovieMapperTest {
         assertEquals(7.5, domain.voteAverage, 0.001)
     }
 
-    // ── FavoriteEntity → Movie ────────────────────────────────────────────────
-
-    @Test
-    fun `FavoriteEntity toDomain maps all fields correctly`() {
-        val entity = fakeFavoriteEntity(id = 9)
-        val domain = entity.toDomain()
-
-        assertEquals(9, domain.id)
-        assertEquals("Test Movie 9", domain.title)
-        assertEquals("/poster9.jpg", domain.posterPath)
-    }
-
-    // ── Movie → MovieEntity ───────────────────────────────────────────────────
-
     @Test
     fun `Movie toEntity maps category and page correctly`() {
         val movie = fakeMovie(id = 2)
@@ -130,18 +107,5 @@ class MovieMapperTest {
         assertEquals(2, entity.id)
         assertEquals(Category.TOP_RATED.name, entity.category)
         assertEquals(3, entity.page)
-    }
-
-    // ── MovieDetail → Movie ───────────────────────────────────────────────────
-
-    @Test
-    fun `MovieDetail toMovie preserves all base fields`() {
-        val detail = com.tcohen.moviesapp.fakeMovieDetail(id = 11)
-        val movie = detail.toMovie()
-
-        assertEquals(11, movie.id)
-        assertEquals("Test Movie Detail 11", movie.title)
-        assertEquals("/poster11.jpg", movie.posterPath)
-        assertEquals(7.5, movie.voteAverage, 0.001)
     }
 }

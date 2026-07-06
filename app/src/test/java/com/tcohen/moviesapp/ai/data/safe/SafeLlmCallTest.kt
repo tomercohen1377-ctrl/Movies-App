@@ -14,17 +14,8 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
-/**
- * Unit tests for [safeLlmCall].
- *
- * Mirrors the philosophy of the existing `safeApiCall`-shaped utilities:
- * every distinct throwable must map to a specific [ApiError] entry so the UI
- * can show the right copy.
- */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SafeLlmCallTest {
-
-    // ── success path ──────────────────────────────────────────────────────────
 
     @Test
     fun `success block returns Success with the value`() = runTest {
@@ -32,8 +23,6 @@ class SafeLlmCallTest {
         assertTrue(result is NetworkResult.Success)
         assertEquals("hello world", (result as NetworkResult.Success).data)
     }
-
-    // ── HTTP error mapping ────────────────────────────────────────────────────
 
     @Test
     fun `401 maps to UNAUTHORIZED`() = runTest {
@@ -83,8 +72,6 @@ class SafeLlmCallTest {
         result.assertErrorMatching(ApiError.LLM_UNAVAILABLE, expectedCode = 418)
     }
 
-    // ── connectivity / IO error mapping ──────────────────────────────────────
-
     @Test
     fun `SocketTimeoutException maps to TIMEOUT`() = runTest {
         val result = safeLlmCall<String> { throw SocketTimeoutException("read timeout") }
@@ -103,15 +90,11 @@ class SafeLlmCallTest {
         result.assertErrorMatching(ApiError.NO_CONNECTION, expectedCode = 0)
     }
 
-    // ── last-resort catch ─────────────────────────────────────────────────────
-
     @Test
     fun `any other Exception maps to UNEXPECTED`() = runTest {
         val result = safeLlmCall<String> { throw IllegalStateException("oops") }
         result.assertErrorMatching(ApiError.UNEXPECTED, expectedCode = 0)
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private fun <T> NetworkResult<T>.assertErrorMatching(
         expected: ApiError,

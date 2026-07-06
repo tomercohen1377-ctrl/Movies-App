@@ -5,13 +5,6 @@ import androidx.room.Insert
 import androidx.room.Query
 import com.tcohen.moviesapp.ai.data.local.entity.AiUsageEntity
 
-/**
- * DAO for the daily / monthly token usage ledger.
- *
- * Single-responsibility: write a row per completed LLM call, aggregate
- * tokens for a given window. Policy (the daily cap itself) lives in
- * [com.tcohen.moviesapp.ai.data.repository.AiUsageRepositoryImpl].
- */
 @Dao
 interface AiUsageDao {
 

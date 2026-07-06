@@ -28,13 +28,6 @@ import com.tcohen.moviesapp.presentation.common.RatingBadge
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 import com.tcohen.moviesapp.util.TmdbImageUrl
 
-/**
- * Stateless composable that renders all textual and visual metadata for a movie:
- * poster thumbnail, title, release year, runtime, rating badge, genre chips,
- * optional tagline, and overview.
- *
- * Intended to be embedded inside a scrollable parent such as [MovieDetailContent].
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MovieMetadata(
@@ -43,7 +36,6 @@ fun MovieMetadata(
 ) {
     Column(modifier = modifier.padding(16.dp)) {
 
-        // Poster thumbnail + title block
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Card(shape = RoundedCornerShape(8.dp)) {
                 MoviePosterImage(
@@ -80,7 +72,6 @@ fun MovieMetadata(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Genre chips
         if (movie.genres.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 movie.genres.forEach { genre ->
@@ -93,7 +84,6 @@ fun MovieMetadata(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Tagline
         if (!movie.tagline.isNullOrBlank()) {
             Text(
                 text = "\"${movie.tagline}\"",
@@ -103,7 +93,6 @@ fun MovieMetadata(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Overview
         Text(
             text = movie.overview,
             style = MaterialTheme.typography.bodyMedium
@@ -111,7 +100,6 @@ fun MovieMetadata(
     }
 }
 
-/** Number of leading characters in `Movie.releaseDate` that form the 4-digit year. */
 private const val RELEASE_YEAR_CHAR_COUNT = 4
 
 @Preview(showBackground = true)

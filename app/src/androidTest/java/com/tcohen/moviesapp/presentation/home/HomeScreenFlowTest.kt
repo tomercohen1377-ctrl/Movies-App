@@ -22,19 +22,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * End-to-end flow tests for the Home screen user journey.
- *
- * HomeScreen itself requires Hilt injection, so these tests drive the stateless
- * composable components that make up the screen — simulating the full browse + select flow.
- */
 @RunWith(AndroidJUnit4::class)
 class HomeScreenFlowTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
-
-    // ── Category filter flow ──────────────────────────────────────────────────
 
     @Test
     fun homeFlow_allCategoryChipsAreDisplayed() {
@@ -98,8 +90,6 @@ class HomeScreenFlowTest {
         assertEquals(Category.UPCOMING, selected)
     }
 
-    // ── Movie grid flow ───────────────────────────────────────────────────────
-
     @Test
     fun homeFlow_movieCardsDisplayTitles() {
         val movies = listOf(fakeMovie(title = "Oppenheimer"), fakeMovie(title = "Barbie"))
@@ -132,8 +122,6 @@ class HomeScreenFlowTest {
         composeTestRule.onNodeWithText("Dune").performClick()
         assertTrue(clicked)
     }
-
-    // ── Offline banner flow ───────────────────────────────────────────────────
 
     @Test
     fun homeFlow_offlineBannerVisibleWhenOffline() {

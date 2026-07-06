@@ -1,6 +1,5 @@
 package com.tcohen.moviesapp.data.mapper
 
-import com.tcohen.moviesapp.data.local.entity.FavoriteEntity
 import com.tcohen.moviesapp.data.local.entity.MovieEntity
 import com.tcohen.moviesapp.data.remote.dto.GenreResponse
 import com.tcohen.moviesapp.data.remote.dto.MovieDetailsResponse
@@ -11,8 +10,6 @@ import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.domain.model.MovieDetail
 import com.tcohen.moviesapp.domain.model.VideoResult
-
-// DTO → Domain
 
 fun MovieResponse.toDomain(): Movie = Movie(
     id = id,
@@ -48,8 +45,6 @@ fun VideoResponse.toDomain(): VideoResult = VideoResult(
     official = official
 )
 
-// Entity → Domain
-
 fun MovieEntity.toDomain(): Movie = Movie(
     id = id,
     title = title,
@@ -61,20 +56,6 @@ fun MovieEntity.toDomain(): Movie = Movie(
     voteCount = voteCount
 )
 
-fun FavoriteEntity.toDomain(): Movie = Movie(
-    id = id,
-    title = title,
-    overview = overview,
-    posterPath = posterPath,
-    backdropPath = backdropPath,
-    releaseDate = releaseDate,
-    voteAverage = voteAverage,
-    voteCount = voteCount
-)
-
-// Domain → Entity
-
-/** Converts a [MovieDetail] back to a lightweight [Movie] for favorites operations. */
 fun MovieDetail.toMovie(): Movie = Movie(
     id = id,
     title = title,
@@ -97,15 +78,4 @@ fun Movie.toEntity(category: Category, page: Int): MovieEntity = MovieEntity(
     voteCount = voteCount,
     category = category.name,
     page = page
-)
-
-fun Movie.toFavoriteEntity() = FavoriteEntity(
-    id = id,
-    title = title,
-    overview = overview,
-    posterPath = posterPath,
-    backdropPath = backdropPath,
-    releaseDate = releaseDate,
-    voteAverage = voteAverage,
-    voteCount = voteCount
 )

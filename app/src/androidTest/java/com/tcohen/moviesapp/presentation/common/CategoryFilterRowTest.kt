@@ -22,8 +22,6 @@ class CategoryFilterRowTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    // ── Display ───────────────────────────────────────────────────────────────
-
     @Test
     fun categoryFilterRow_displaysUpcomingChip() {
         composeTestRule.setContent {
@@ -65,8 +63,6 @@ class CategoryFilterRowTest {
 
         composeTestRule.onNodeWithText("Now Playing").assertIsDisplayed()
     }
-
-    // ── Selection ─────────────────────────────────────────────────────────────
 
     @Test
     fun categoryFilterRow_clickTopRated_invokesCallback() {
@@ -134,10 +130,8 @@ class CategoryFilterRowTest {
             }
         }
 
-        // Click Top Rated chip
         composeTestRule.onNodeWithText("Top Rated").performClick()
 
-        // Top Rated chip should still be displayed after click
         composeTestRule.onNodeWithText("Top Rated").assertIsDisplayed()
     }
 }

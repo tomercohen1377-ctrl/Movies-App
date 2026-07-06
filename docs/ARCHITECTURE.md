@@ -292,6 +292,23 @@ sealed class NetworkResult<out T> {
 
 ---
 
+## Remote Sources
+
+Two hosts, two separate `OkHttpClient` instances, two log tags:
+
+| Source | What it serves | Files |
+|---|---|---|
+| **TMDB** (`api.themoviedb.org`) | Movie lists (now-playing, top-rated, upcoming), movie detail, video trailers, image URLs (Coil) | `data/remote/api/`, `data/remote/interceptor/AuthInterceptor.kt` (Bearer‑token), `NetworkModule` |
+| **Kotlin server** (`moviesapp-server-production.up.railway.app`) | Cross‑device favorites list (`[{ movieId, savedAt }]`), auth (register / token / whoami) | `data/remote/server/`, `ServerBearerInterceptor`, `ServerTokenAuthenticator` (401 → refresh → retry), `ServerNetworkModule` |
+
+The favorites pipeline is **hybrid**: server is the cross‑device source of truth for the list of IDs, Room (`FavoriteEntity` table) holds the rich movie metadata locally, and `FavoritesHydrator` (in `data/remote/server/hydrate/`) joins them on every read. Cross‑device favorites fall through to a TMDB `MovieDetail` lookup.
+
+The `MovieRepository` interface has the **same method names and return types** as before the migration — the swap is entirely behind the public API.
+
+See `docs/SERVER_FAVORITES_MIGRATION_PLAN.md` for the full migration design and `docs/SERVER_SETUP.md` for local‑dev instructions.
+
+---
+
 ## Threading Model
 
 | Operation | Dispatcher |

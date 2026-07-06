@@ -9,13 +9,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 
-/**
- * JUnit [TestWatcher] that sets [Dispatchers.Main] to a [TestDispatcher] for the duration
- * of each test, then resets it afterwards.
- *
- * Use [UnconfinedTestDispatcher] (default) for tests that need coroutines to run eagerly
- * on the calling thread — ideal for ViewModel state assertion tests.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule(
     val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()

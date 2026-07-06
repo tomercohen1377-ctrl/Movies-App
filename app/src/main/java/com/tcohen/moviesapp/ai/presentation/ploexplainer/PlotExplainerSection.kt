@@ -33,15 +33,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tcohen.moviesapp.presentation.common.ErrorView
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 
-/**
- * Streaming plot-summary section embedded at the bottom of
- * `MovieDetailContent`. State-owning wrapper that observes
- * [PlotExplainerViewModel.state] and delegates rendering to the stateless
- * [PlotExplainerContent] — the same code path that UI tests exercise.
- *
- * The wrapping pattern lets instrumentation tests render any
- * [PlotExplainerState] without needing a real [LlmClient] or Hilt.
- */
 @Composable
 fun PlotExplainerSection(
     title: String,
@@ -64,13 +55,6 @@ fun PlotExplainerSection(
     )
 }
 
-/**
- * Stateless renderer used by both the production wrapper and the UI tests.
- *
- * Renders one of the four [PlotExplainerState] branches exhaustively — every
- * branch carries a unique `testTag(...)` so the UI test can locate it
- * semantically.
- */
 @Composable
 fun PlotExplainerContent(
     state: PlotExplainerState,
@@ -115,8 +99,6 @@ fun PlotExplainerContent(
         }
     }
 }
-
-// ── Sub-composables (private) ────────────────────────────────────────────────
 
 @Composable
 private fun SectionHeader() {
@@ -206,8 +188,6 @@ private fun DoneBubble(text: String, onReset: () -> Unit) {
     }
 }
 
-// ── Test tags (mirrors the project's `movie_card` convention) ────────────────
-
 private const val TEST_TAG_SECTION: String = "plot_explainer_section"
 private const val TEST_TAG_EXPLAIN_BUTTON: String = "plot_explainer_explain_button"
 private const val TEST_TAG_STREAMING_TEXT: String = "plot_explainer_streaming_text"
@@ -216,21 +196,12 @@ private const val TEST_TAG_DONE_TEXT: String = "plot_explainer_done_text"
 private const val TEST_TAG_RESET_BUTTON: String = "plot_explainer_reset_button"
 private const val TEST_TAG_ERROR: String = "plot_explainer_error"
 
-// ── Pixel constants (mirrors MovieCardDefaults / DetailScreenDefaults) ──────
-
 private const val PADDING_HORIZONTAL_DP: Int = 16
 private const val PADDING_VERTICAL_DP: Int = 8
 private const val PADDING_INNER_DP: Int = 16
 private const val SPACE_BETWEEN_ELEMENTS_DP: Int = 8
 private const val SPACE_AFTER_TEXT_DP: Int = 8
 
-// ── @Preview (matches the project's pattern — every composable has @Preview) ──
-
-/**
- * Idle-branch preview. The production code path goes through `hiltViewModel()`;
- * the preview drives the stateless [PlotExplainerContent] directly so we don't
- * need a Hilt graph inside Android Studio.
- */
 @Preview(showBackground = true)
 @Composable
 private fun PlotExplainerContentIdlePreview() {

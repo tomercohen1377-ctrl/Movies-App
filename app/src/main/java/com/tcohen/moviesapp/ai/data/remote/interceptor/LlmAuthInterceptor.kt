@@ -5,14 +5,6 @@ import okhttp3.Response
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Attaches a Bearer token to every outgoing LLM request.
- *
- * - Provider default: Google Gemini (OpenAI-compatible schema). The token is the
- *   `GEMINI_API_KEY` placed in `BuildConfig` by `app/build.gradle.kts`.
- * - Swap providers = swap base URL + key in [com.tcohen.moviesapp.di.LlmModule];
- *   this interceptor is unchanged.
- */
 @Singleton
 class LlmAuthInterceptor @Inject constructor(
     val apiKey: String

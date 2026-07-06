@@ -14,12 +14,6 @@ import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.displayName
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 
-/**
- * Horizontally scrollable row of [FilterChip]s — one per [Category].
- *
- * The selected chip is visually distinguished (filled tint + checkmark icon).
- * The [LazyRow] is future-proof: adding more categories requires no layout changes.
- */
 @Composable
 fun CategoryFilterRow(
     selectedCategory: Category,

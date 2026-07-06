@@ -30,30 +30,18 @@ import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 import com.tcohen.moviesapp.util.TmdbImageUrl
 
 private object MovieCardDefaults {
-    /** Aspect ratio of the poster card: 2-wide by 3-tall (standard movie poster format). */
+
     const val ASPECT_RATIO = 2f / 3f
 
-    /** Corner radius for the card shape. */
     val CORNER_RADIUS = 10.dp
 
-    /** Default elevation for the card shadow. */
     val ELEVATION = 4.dp
 
-    /** Fraction of the card height covered by the bottom gradient scrim. */
     const val SCRIM_HEIGHT_FRACTION = 0.45f
 
-    /** Opacity of the darkest point of the bottom gradient scrim. */
     const val SCRIM_GRADIENT_ALPHA = 0.85f
 }
 
-/**
- * Full-bleed poster card shown in the movie grid.
- *
- * Layout:
- * - Poster image fills the entire card (2:3 aspect ratio)
- * - Semi-transparent gradient scrim at the bottom
- * - Movie title + [RatingBadge] overlaid on the scrim
- */
 @Composable
 fun MovieCard(
     movie: Movie,
@@ -70,14 +58,12 @@ fun MovieCard(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
 
-            // Poster image — full bleed
             MoviePosterImage(
                 imageUrl = TmdbImageUrl.poster(movie.posterPath),
                 contentDescription = movie.title,
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Bottom gradient scrim for text readability
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -90,7 +76,6 @@ fun MovieCard(
                     )
             )
 
-            // Title + rating overlaid on scrim
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)

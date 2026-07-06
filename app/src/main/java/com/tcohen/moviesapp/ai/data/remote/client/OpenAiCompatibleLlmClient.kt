@@ -36,18 +36,6 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
-/**
- * Default [LlmClient] implementation — talks to any provider that exposes an
- * OpenAI-compatible `/chat/completions` endpoint.
- *
- * Default swap-in for Google Gemini `gemini-2.0-flash` (free tier) using the
- * `https://generativelanguage.googleapis.com/v1beta/openai/` base URL.
- *
- * Reading and writing pass through [cache] — the [OpenAiCompatibleLlmClient.complete]
- * path returns cached data without a network round-trip on hit; [stream]
- * bypasses the cache because streamed responses cannot be cached cleanly
- * (partial tool calls, multi-chunk semantics).
- */
 @Singleton
 class OpenAiCompatibleLlmClient @Inject constructor(
     private val authInterceptor: LlmAuthInterceptor,
@@ -72,10 +60,8 @@ class OpenAiCompatibleLlmClient @Inject constructor(
             .create(OpenAiCompatibleApi::class.java)
     }
 
-    // ── non-streaming ─────────────────────────────────────────────────────────
-
     override suspend fun complete(request: ChatRequest): NetworkResult<ChatCompletion> {
-        // Cache lookup — bypass network on identical requests.
+
         val versionedRequest = request.copy(model = request.model.ifEmpty { defaultModel })
         cache.get(versionedRequest, PROMPT_VERSION_DEFAULT)?.let { cached ->
             return NetworkResult.Success(cached)
@@ -90,25 +76,11 @@ class OpenAiCompatibleLlmClient @Inject constructor(
         return result
     }
 
-    // ── streaming ─────────────────────────────────────────────────────────────
-
-    /**
-     * Token-by-token stream of assistant text. Each emission is a
-     * [NetworkResult.Success] wrapping a single delta. Errors mid-stream are
-     * mapped by [streamingErrorMessage] and emitted as a single terminal
-     * [NetworkResult.Error].
-     *
-     * Implementation note: we issue the request directly through OkHttp (not
-     * Retrofit) because the [mediaType] is `text/event-stream` and we want
-     * full control over the `ResponseBody` lifecycle for cancellation.
-     */
     override fun stream(request: ChatRequest): Flow<NetworkResult<String>> = flow {
         val versionedRequest = request.copy(model = request.model.ifEmpty { defaultModel })
         val httpRequest = buildStreamingRequest(versionedRequest)
         val call: Call = httpClient.newCall(httpRequest)
 
-        // Abort the underlying HTTP call when the collecting coroutine is
-        // cancelled so the socket is returned to the pool promptly.
         val cancellationHook = currentCoroutineContext()[Job]
             ?.invokeOnCompletion { if (it != null) call.cancel() }
 
@@ -124,9 +96,6 @@ class OpenAiCompatibleLlmClient @Inject constructor(
                 return@flow
             }
 
-            // Per-stream diagnostic counters — logged at end so a developer
-            // can see whether Gemini sent 1 chunk or 50. Helps isolate
-            // "model only wrote three tokens" from "we only parsed one".
             var chunkCount = 0
             var firstDelta: String? = null
             var lastFinishReason: String? = null
@@ -161,12 +130,6 @@ class OpenAiCompatibleLlmClient @Inject constructor(
         }
     }.flowOn(Dispatchers.IO)
 
-    /**
-     * Logs the failing response's status code and body to Logcat under
-     * [LOG_TAG_LLM_HTTP] so a developer (or recruiter running `adb logcat -s
-     * LLM_HTTP`) can see exactly what the provider returned, not just our
-     * mapped user-facing message.
-     */
     private fun logErrorResponse(response: okhttp3.Response, source: String) {
         val msg = response.message
         val body = runCatching { response.peekBody(PEEK_BODY_BYTE_LIMIT).string() }.getOrNull()
@@ -175,8 +138,6 @@ class OpenAiCompatibleLlmClient @Inject constructor(
             "<-- ${response.code} $msg [$source] ${body?.take(PEEK_BODY_LOG_LIMIT) ?: "(no body)"}"
         )
     }
-
-    // ── internals ─────────────────────────────────────────────────────────────
 
     private fun buildStreamingRequest(request: ChatRequest): Request {
         val dto = request.toDto(stream = true)
@@ -191,7 +152,6 @@ class OpenAiCompatibleLlmClient @Inject constructor(
             .build()
     }
 
-    /** Convert one SSE data frame to a text delta (or null if there's no delta). */
     private fun parseDelta(payload: String): String? {
         val chunk = runCatching {
             json.decodeFromString(ChatCompletionChunkDto.serializer(), payload)
@@ -201,10 +161,6 @@ class OpenAiCompatibleLlmClient @Inject constructor(
         return deltaContent.takeIf { it.isNotEmpty() }
     }
 
-    /**
-     * Variant that returns both the text delta AND the chunk's `finish_reason`
-     * so we can log stream-completion diagnostics without losing any text.
-     */
     private fun parseDeltaForSummary(payload: String): ParsedChunk {
         val chunk = runCatching {
             json.decodeFromString(ChatCompletionChunkDto.serializer(), payload)
@@ -215,7 +171,6 @@ class OpenAiCompatibleLlmClient @Inject constructor(
         return ParsedChunk(delta, finishReason)
     }
 
-    /** Tiny holder for [parseDeltaForSummary] — keeps both values without a tuple. */
     private data class ParsedChunk(val delta: String?, val finishReason: String?)
 
     private fun streamingErrorMessage(code: Int): NetworkResult.Error = when (code) {
@@ -230,63 +185,45 @@ class OpenAiCompatibleLlmClient @Inject constructor(
     }
 
     companion object {
-        // ── Raw magic strings (private; preferred source for downstream consts) ─
+
         private const val CONTENT_TYPE_JSON: String = "application/json"
         private const val CONTENT_TYPE_EVENT_STREAM: String = "text/event-stream"
         private const val HEADER_AUTHORIZATION: String = "Authorization"
         private const val HEADER_ACCEPT: String = "Accept"
 
-        // ── Diagnostic logging ────────────────────────────────────────────────
-        /** Logcat tag for LLM HTTP traffic. Filter with: `adb logcat -s LLM_HTTP`. */
         const val LOG_TAG_LLM_HTTP: String = "LLM_HTTP"
 
-        /** Hard cap when peeking the response body for logging (8 KB). */
         private const val PEEK_BODY_BYTE_LIMIT: Long = 8L * 1024
 
-        /** Hard cap when printing the peeked body in Logcat text. */
         private const val PEEK_BODY_LOG_LIMIT: Int = 500
 
-        /** Hard cap when printing the first delta for diagnostic logs. */
         private const val SSE_LOG_PAYLOAD_LIMIT: Int = 80
 
-        // ── Media types (cannot be `const val`, OkHttp types) ──────────────────
         private val JSON_MEDIA_TYPE: MediaType = CONTENT_TYPE_JSON.toMediaType()
         private val EVENT_STREAM_MEDIA_TYPE: MediaType = CONTENT_TYPE_EVENT_STREAM.toMediaType()
 
-        // ── HTTP header names (public, intended for cross-package reuse) ───────
-        /** Name of the HTTP header carrying the Bearer token. */
         const val AUTHORIZATION_HEADER: String = HEADER_AUTHORIZATION
 
-        /** Name of the HTTP header carrying the client's accepted response format. */
         const val ACCEPT_HEADER: String = HEADER_ACCEPT
 
-        // ── Wire-protocol prefixes ────────────────────────────────────────────
         const val BEARER_TOKEN_PREFIX: String = "Bearer "
         const val CHAT_COMPLETIONS_PATH: String = "/chat/completions"
         const val URL_PATH_SEPARATOR: Char = '/'
 
-        // ── HTTP status codes used by the LLM error mapper ─────────────────────
         const val HTTP_STATUS_UNAUTHORIZED: Int = 401
         const val HTTP_STATUS_FORBIDDEN: Int = 403
         const val HTTP_STATUS_RATE_LIMITED: Int = 429
         const val HTTP_STATUS_SERVER_ERROR_MIN: Int = 500
         const val HTTP_STATUS_SERVER_ERROR_MAX: Int = 599
 
-        // ── `finish_reason` strings returned in OpenAI-shaped responses ───────
         const val FINISH_REASON_STOP: String = "stop"
         const val FINISH_REASON_TOOL_CALLS: String = "tool_calls"
         const val FINISH_REASON_LENGTH: String = "length"
         const val FINISH_REASON_CONTENT_FILTER: String = "content_filter"
 
-        // ── Cache prompt-version used by writes from this code path ───────────
-        /** Default prompt version tag used by the response cache. Bump when
-         *  the system prompt of any feature changes semantically; the cache
-         *  simply uses it as part of the key. */
         const val PROMPT_VERSION_DEFAULT: String = "phase0-v1"
     }
 }
-
-// ── DTO ↔ Domain ─────────────────────────────────────────────────────────────
 
 private fun ChatCompletionResponseDto.toDomain(): ChatCompletion {
     val choice = choices.firstOrNull()

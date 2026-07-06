@@ -7,6 +7,7 @@ import com.tcohen.moviesapp.data.local.dao.MovieDao
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
 import com.tcohen.moviesapp.domain.model.Category
 import com.tcohen.moviesapp.domain.model.Movie
+import com.tcohen.moviesapp.fakeMovieDto
 import com.tcohen.moviesapp.fakeMovieEntity
 import com.tcohen.moviesapp.fakeMovieListResponse
 import com.tcohen.moviesapp.util.NetworkMonitor
@@ -32,7 +33,7 @@ class MoviePagingSourceTest {
 
     @Before
     fun setUp() {
-        // Stubs needed by the online path
+
         coJustRun { movieDao.insertAll(any()) }
         coJustRun { movieDao.deleteByCategory(any()) }
     }
@@ -40,12 +41,14 @@ class MoviePagingSourceTest {
     private fun createSource(category: Category = Category.UPCOMING) =
         MoviePagingSource(apiService, movieDao, category, networkMonitor)
 
-    // ── Online path ───────────────────────────────────────────────────────────
-
     @Test
     fun `online - first page loaded with correct nextKey`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
-        coEvery { apiService.getUpcomingMovies(1) } returns fakeMovieListResponse(page = 1, totalPages = 5)
+        coEvery { apiService.getUpcomingMovies(1) } returns fakeMovieListResponse(
+            page = 1,
+            totalPages = 5,
+            results = List(20) { fakeMovieDto(id = it + 1) },
+        )
 
         val pager = TestPager(pagingConfig, createSource())
         val result = pager.refresh() as PagingSource.LoadResult.Page<Int, Movie>
@@ -125,8 +128,6 @@ class MoviePagingSourceTest {
 
         assertTrue(result is PagingSource.LoadResult.Error)
     }
-
-    // ── Offline path ──────────────────────────────────────────────────────────
 
     @Test
     fun `offline - returns cached data from Room`() = runTest {

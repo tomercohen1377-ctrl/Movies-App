@@ -34,8 +34,6 @@ class HomeViewModelTest {
         viewModel = HomeViewModel(repository, networkMonitor)
     }
 
-    // ── Initial state ─────────────────────────────────────────────────────────
-
     @Test
     fun `initial selectedCategory is NOW_PLAYING`() {
         assertEquals(Category.NOW_PLAYING, viewModel.state.value.selectedCategory)
@@ -45,8 +43,6 @@ class HomeViewModelTest {
     fun `initial isOffline is false when network is available`() {
         assertFalse(viewModel.state.value.isOffline)
     }
-
-    // ── SelectCategory ────────────────────────────────────────────────────────
 
     @Test
     fun `SelectCategory updates selectedCategory in state`() {
@@ -67,8 +63,6 @@ class HomeViewModelTest {
         assertEquals(Category.NOW_PLAYING, viewModel.state.value.selectedCategory)
     }
 
-    // ── OpenDetail ────────────────────────────────────────────────────────────
-
     @Test
     fun `OpenDetail emits NavigateToDetail effect with correct id`() = runTest {
         viewModel.effects.test {
@@ -88,8 +82,6 @@ class HomeViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    // ── Network status ────────────────────────────────────────────────────────
 
     @Test
     fun `isOffline is true when NetworkMonitor emits false`() {

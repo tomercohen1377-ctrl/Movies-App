@@ -9,13 +9,6 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
-/**
- * Executes [block] and wraps the outcome in a [NetworkResult].
- *
- * For HTTP errors the TMDB error body is parsed and its `status_message` is
- * used as the user-facing message. If parsing fails, [ApiError.SERVER_ERROR]
- * is used as a fallback. Connectivity failures map to the other [ApiError] entries.
- */
 suspend fun <T> safeApiCall(block: suspend () -> T): NetworkResult<T> {
     return try {
         NetworkResult.Success(block())

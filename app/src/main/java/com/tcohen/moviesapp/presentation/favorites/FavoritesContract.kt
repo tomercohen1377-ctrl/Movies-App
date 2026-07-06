@@ -2,27 +2,29 @@ package com.tcohen.moviesapp.presentation.favorites
 
 import com.tcohen.moviesapp.domain.model.Movie
 
-// ── State ────────────────────────────────────────────────────────────────────
+sealed interface FavoritesState {
 
-data class FavoritesState(
-    val isOffline: Boolean = false
-)
+    data object Loading : FavoritesState
 
-// ── Intents ───────────────────────────────────────────────────────────────────
+    data class Success(val movies: List<Movie>) : FavoritesState
 
-sealed interface FavoritesIntent {
-    data class OpenDetail(val movieId: Int) : FavoritesIntent
+    data object Empty : FavoritesState
 
-    /**
-     * Removes [movie] from favorites.
-     * The full [Movie] object is required so the repository can perform
-     * the local delete and server sync without an additional lookup.
-     */
-    data class RemoveFavorite(val movie: Movie) : FavoritesIntent
+    data class Error(val httpCode: Int, val message: String) : FavoritesState
 }
 
-// ── Effects (one-shot) ────────────────────────────────────────────────────────
+sealed interface FavoritesIntent {
+
+    data class RemoveFavorite(val movie: Movie) : FavoritesIntent
+
+    data object Refresh : FavoritesIntent
+
+    data class OpenDetail(val movieId: Int) : FavoritesIntent
+}
 
 sealed interface FavoritesEffect {
+
     data class NavigateToDetail(val movieId: Int) : FavoritesEffect
+
+    data class ShowSnackbar(val message: String) : FavoritesEffect
 }

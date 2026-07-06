@@ -191,6 +191,8 @@ Every non-obvious literal is a named `const val` co-located with the class that 
 | `DATABASE_NAME` | `AppDatabase.Companion` |
 | `BACK_BUTTON_SCRIM_ALPHA`, `FAB_COLOR_ANIMATION_MS`, `RELEASE_YEAR_CHAR_COUNT` | `DetailScreenDefaults` (private object) |
 | `ASPECT_RATIO`, `SCRIM_HEIGHT_FRACTION`, `SCRIM_GRADIENT_ALPHA` | `MovieCardDefaults` (private object) |
+| `AUTH_HEADER`, `BEARER_PREFIX`, `USER_ID_HEADER`, `PASSWORD_HEADER`, `AUTH_HEADER_REDACTED_VALUE`, `SERVER_TIMEOUT_MS` | `ServerDefaults` (server layer) |
+| `AUTH_TTL_MS`, `MAX_USERID_REGEN_ATTEMPTS`, `MIN_PASSWORD_LENGTH`, `TOKEN_EXPIRY_GRACE_SECONDS` | `AuthDefaults` (auth layer) |
 
 ### Other Conventions
 

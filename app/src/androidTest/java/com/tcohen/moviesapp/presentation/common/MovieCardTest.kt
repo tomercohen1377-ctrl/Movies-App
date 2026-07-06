@@ -18,8 +18,6 @@ class MovieCardTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    // ── Title display ─────────────────────────────────────────────────────────
-
     @Test
     fun movieCard_displaysMovieTitle() {
         val movie = fakeMovie(title = "Inception")
@@ -41,7 +39,6 @@ class MovieCardTest {
             }
         }
 
-        // RatingBadge formats voteAverage to one decimal place
         composeTestRule.onNodeWithText("8.5").assertIsDisplayed()
     }
 
@@ -56,8 +53,6 @@ class MovieCardTest {
 
         composeTestRule.onNodeWithText("3.0").assertIsDisplayed()
     }
-
-    // ── Click handling ────────────────────────────────────────────────────────
 
     @Test
     fun movieCard_onClick_isInvoked() {
@@ -85,7 +80,6 @@ class MovieCardTest {
             }
         }
 
-        // No click performed
         assertTrue(!clicked)
     }
 }

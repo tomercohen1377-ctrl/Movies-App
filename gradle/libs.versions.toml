@@ -39,6 +39,9 @@ youtubePlayer = "13.0.0"
 # Coroutines
 coroutines = "1.9.0"
 
+# Security (Phase 2 — EncryptedSharedPreferences for stored refresh-token password)
+securityCrypto = "1.1.0-alpha06"
+
 # Testing
 junit = "4.13.2"
 junitExt = "1.2.1"
@@ -98,6 +101,9 @@ youtube-player = { group = "com.pierfrancescosoffritti.androidyoutubeplayer", na
 
 # Coroutines
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# EncryptedSharedPreferences (Phase 2 — local storage for the refresh password)
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

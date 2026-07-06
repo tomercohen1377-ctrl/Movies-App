@@ -20,34 +20,24 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * End-to-end flow tests for the movie detail screen user journey.
- *
- * Tests drive the sealed [MovieDetailUiState] transitions and the stateless
- * composables that render each state — simulating loading → success / error flows.
- */
 @RunWith(AndroidJUnit4::class)
 class MovieDetailFlowTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    // ── Loading state ─────────────────────────────────────────────────────────
-
     @Test
     fun detailFlow_loadingStateShowsSpinner() {
         composeTestRule.setContent {
             MoviesAppTheme {
-                // Simulate the Loading branch of MovieDetailScreen
+
                 CircularProgressIndicator()
             }
         }
 
         composeTestRule.onNodeWithContentDescription("Loading").assertDoesNotExist()
-        // CircularProgressIndicator is present (doesn't crash, renders correctly)
-    }
 
-    // ── Error state ───────────────────────────────────────────────────��───────
+    }
 
     @Test
     fun detailFlow_errorStateShowsMessage() {
@@ -93,8 +83,6 @@ class MovieDetailFlowTest {
         assertTrue(retried)
     }
 
-    // ── Success state ─────────────────────────────────────────────────────────
-
     @Test
     fun detailFlow_successStateShowsTitle() {
         val state = MovieDetailUiState.Success(
@@ -130,7 +118,7 @@ class MovieDetailFlowTest {
     @Test
     fun detailFlow_successStateShowsGenres() {
         val state = MovieDetailUiState.Success(
-            movie = fakeMovieDetail(), // includes Action + Adventure genres
+            movie = fakeMovieDetail(),
             trailerKey = null,
             isFavorite = false
         )
@@ -144,11 +132,9 @@ class MovieDetailFlowTest {
         composeTestRule.onNodeWithText("Adventure").assertIsDisplayed()
     }
 
-    // ── State transition simulation ───────────────────────────────────────────
-
     @Test
     fun detailFlow_transitionFromLoadingToSuccess() {
-        // State lives outside setContent so mutations trigger recomposition
+
         var uiState: MovieDetailUiState by mutableStateOf(MovieDetailUiState.Loading)
 
         composeTestRule.setContent {
@@ -164,10 +150,8 @@ class MovieDetailFlowTest {
             }
         }
 
-        // Verify loading state is shown first
         composeTestRule.onNodeWithText("Loading…").assertIsDisplayed()
 
-        // Simulate data arriving (outside setContent → triggers recomposition)
         composeTestRule.runOnIdle {
             uiState = MovieDetailUiState.Success(
                 movie = fakeMovieDetail(title = "The Matrix"),
@@ -198,7 +182,6 @@ class MovieDetailFlowTest {
 
         composeTestRule.onNodeWithText("Loading…").assertIsDisplayed()
 
-        // Simulate error arriving
         composeTestRule.runOnIdle {
             uiState = MovieDetailUiState.Error("No internet connection")
         }

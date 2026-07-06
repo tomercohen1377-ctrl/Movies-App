@@ -21,4 +21,7 @@ interface MovieDao {
     @Query("SELECT MAX(page) FROM movies WHERE category = :category")
     suspend fun getLastCachedPage(category: String): Int?
 
+    @Query("SELECT * FROM movies WHERE id = :movieId LIMIT 1")
+    suspend fun findById(movieId: Int): MovieEntity?
+
 }

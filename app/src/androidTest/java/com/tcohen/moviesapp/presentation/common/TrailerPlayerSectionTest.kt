@@ -9,13 +9,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Instrumented tests for [TrailerPlayerSection].
- *
- * The YouTube player ([YouTubePlayerView]) is an [AndroidView] wrapping a WebView.
- * It requires a real device/emulator and a valid internet connection to fully initialise,
- * so these tests verify rendering and lifecycle integration rather than playback state.
- */
 @RunWith(AndroidJUnit4::class)
 class TrailerPlayerSectionTest {
 
@@ -30,7 +23,6 @@ class TrailerPlayerSectionTest {
             }
         }
 
-        // Root node is present — composable renders without throwing
         composeTestRule.onRoot().assertIsDisplayed()
     }
 

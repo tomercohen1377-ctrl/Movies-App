@@ -8,14 +8,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Unit tests for [SseStreamParser].
- *
- * The parser is generic over SSE; tests feed it a synthetic [okhttp3.ResponseBody]
- * built from a String with `text/event-stream` MIME, so the parser contract
- * (data lines, [DONE] sentinel, blank-line events, comments) is exercised
- * without any HTTP infrastructure.
- */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SseStreamParserTest {
 
@@ -98,22 +90,21 @@ class SseStreamParserTest {
 
     @Test
     fun `handles mixed event boundaries across chunks`() = runTest {
-        // simulate byte-by-byte arrival — the parser must still split on LF
+
         val bytes = "data:partA\ndata:partB\ndata:[DONE]\n".toByteArray()
         val responses = bytes.indices.map { i ->
             String(bytes, 0, i + 1).toResponseBody(EVENT_STREAM)
         }
-        // We can't actually re-create a streaming response from a string trivially here;
-        // instead assert that one large blob containing the same wire data parses correctly.
+
         val emissions = parser("data:partA\ndata:partB\ndata:[DONE]\n").toList()
         assertEquals(listOf("partA", "partB"), emissions)
-        // Sanity: ensure we used the constant at least once so callers don't get a warning.
+
         assertTrue(responses.size == bytes.size)
     }
 
     @Test
     fun `handles payload with no leading space after colon`() = runTest {
-        // Both formats are valid SSE; removePrefix + trim takes care of both.
+
         val sse = """
             data:spaced-out
             data: with-leading-space
@@ -138,8 +129,6 @@ class SseStreamParserTest {
         val emissions = flow.toList()
         assertEquals(listOf("keep-me", "keep-me-too"), emissions)
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private fun parser(payload: String) = SseStreamParser { it }
         .stream(payload.toResponseBody(EVENT_STREAM))

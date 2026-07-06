@@ -13,19 +13,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Instrumented UI tests for [PlotExplainerContent] — the stateless renderer
- * that backs [PlotExplainerSection]. Drives each of the four
- * [PlotExplainerState] branches directly so we don't need a real
- * [com.tcohen.moviesapp.ai.domain.client.LlmClient] or Hilt at test time.
- */
 @RunWith(AndroidJUnit4::class)
 class PlotExplainerSectionTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
-
-    // ── Idle ──────────────────────────────────────────────────────────────────
 
     @Test
     fun plotExplainer_rendersIdleButtonInitially() {
@@ -65,8 +57,6 @@ class PlotExplainerSectionTest {
         assertTrue("onExplain must fire once per click", explainCalls == 1)
     }
 
-    // ── Streaming ─────────────────────────────────────────────────────────────
-
     @Test
     fun plotExplainer_rendersStreamingBubbleWithGrowingText() {
         composeTestRule.setContent {
@@ -100,8 +90,6 @@ class PlotExplainerSectionTest {
 
         composeTestRule.onNodeWithText("Thinking…").assertIsDisplayed()
     }
-
-    // ── Done ──────────────────────────────────────────────────────────────────
 
     @Test
     fun plotExplainer_rendersDoneBubbleWithFinalText() {
@@ -141,8 +129,6 @@ class PlotExplainerSectionTest {
         assertTrue("onReset must fire once per click", resetCalls == 1)
     }
 
-    // ── Error ─────────────────────────────────────────────────────────────────
-
     @Test
     fun plotExplainer_rendersErrorViewWithRetry() {
         var retryCalls = 0
@@ -175,8 +161,6 @@ class PlotExplainerSectionTest {
             }
         }
 
-        // `ErrorView` shows a "Retry" button — locating by text is the
-        // simplest stable selector across Material 3 theme changes.
         composeTestRule.onNodeWithText("Retry").performClick()
         assertTrue("onRetry must fire once per click", retryCalls == 1)
     }

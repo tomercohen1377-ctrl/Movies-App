@@ -6,8 +6,6 @@ import org.junit.Test
 
 class CategoryExtTest {
 
-    // ── displayName ───────────────────────────────────────────────────────────
-
     @Test
     fun `NOW_PLAYING displayName is 'Now Playing'`() {
         assertEquals("Now Playing", Category.NOW_PLAYING.displayName)
@@ -38,8 +36,6 @@ class CategoryExtTest {
         }
     }
 
-    // ── enum order ────────────────────────────────────────────────────────────
-
     @Test
     fun `NOW_PLAYING is first in entries`() {
         assertEquals(Category.NOW_PLAYING, Category.entries.first())
@@ -54,8 +50,6 @@ class CategoryExtTest {
     fun `entries count is 3`() {
         assertEquals(3, Category.entries.size)
     }
-
-    // ── display name content ──────────────────────────────────────────────────
 
     @Test
     fun `TOP_RATED displayName contains a space`() {

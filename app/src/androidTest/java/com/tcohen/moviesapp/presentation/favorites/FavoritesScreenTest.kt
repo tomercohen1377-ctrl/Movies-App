@@ -9,19 +9,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Tests for the stateless composables extracted from [FavoritesScreen].
- *
- * The paging-driven [FavoritesGrid] requires a full Hilt graph to test end-to-end.
- * These tests exercise the [EmptyFavoritesState] composable in isolation.
- */
 @RunWith(AndroidJUnit4::class)
 class FavoritesScreenTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
-
-    // ── Empty state ───────────────────────────────────────────────────────────
 
     @Test
     fun emptyFavoritesState_showsHeadline() {

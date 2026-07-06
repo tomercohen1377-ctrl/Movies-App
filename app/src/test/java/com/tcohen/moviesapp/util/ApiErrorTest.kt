@@ -7,11 +7,9 @@ import org.junit.Test
 
 class ApiErrorTest {
 
-    // ── enum entries ──────────────────────────────────────────────────────────
-
     @Test
     fun `ApiError has 8 entries (4 TMDB + 4 LLM)`() {
-        // 4 pre-existing TMDB entries, 4 LLM entries added in Phase 0.
+
         assertEquals(8, ApiError.entries.size)
     }
 
@@ -28,8 +26,6 @@ class ApiErrorTest {
         assertEquals(messages.size, messages.toSet().size)
     }
 
-    // ── TMDB / generic message content ────────────────────────────────────────
-
     @Test
     fun `NO_CONNECTION message mentions internet`() {
         assertTrue(ApiError.NO_CONNECTION.message.contains("internet", ignoreCase = true))
@@ -45,8 +41,6 @@ class ApiErrorTest {
     fun `UNEXPECTED message mentions unexpected`() {
         assertTrue(ApiError.UNEXPECTED.message.contains("unexpected", ignoreCase = true))
     }
-
-    // ── LLM-specific message content (Phase 0) ───────────────────────────────
 
     @Test
     fun `UNAUTHORIZED message mentions auth or api key`() {
@@ -79,8 +73,6 @@ class ApiErrorTest {
             msg.contains("long") || msg.contains("length") || msg.contains("context")
         )
     }
-
-    // ── NetworkResult.Error integration ──────────────────────────────────────
 
     @Test
     fun `NetworkResult Error with ApiError message round-trips correctly`() {

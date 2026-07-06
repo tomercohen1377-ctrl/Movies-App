@@ -9,17 +9,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Unit tests for [AiUsageRepositoryImpl].
- *
- * The two invariants the plan calls out:
- *
- * 1. **Cap is enforced BEFORE any network call** — feature ViewModels must
- *    not be on the hook for an LLM request when the day is already blown.
- *    Verified directly by polling the fake DAO and asserting mutations.
- * 2. **Token counting matches the synthetic row** — a recorded call shows up
- *    in `tokensSince` exactly.
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AiUsageRepositoryImplTest {
 
@@ -75,21 +64,18 @@ class AiUsageRepositoryImplTest {
         dao.insert(AiUsageEntity(
             model = "test", feature = "test",
             inputTokens = 10, outputTokens = 10,
-            timestamp = 0L  // epoch — inside "today"
+            timestamp = 0L
         ))
         dao.insert(AiUsageEntity(
             model = "test", feature = "test",
             inputTokens = 999, outputTokens = 999,
-            timestamp = 99L  // also "today" given the fake todayClock returns 0L
+            timestamp = 99L
         ))
 
         val inToday = repo.tokensSince(todayClock.startOfTodayMillis())
         assertEquals(2018, inToday)
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /** Today at midnight (or 0L in the fake). */
     private val todayClock = object : TimeProvider {
         override fun startOfTodayMillis(): Long = 0L
     }
@@ -97,7 +83,7 @@ class AiUsageRepositoryImplTest {
     private suspend fun newRepository(underCap: Boolean): AiUsageRepositoryImpl {
         val dao = TestAiUsageDao()
         if (!underCap) {
-            // Seed enough tokens to push the daily total past the cap.
+
             dao.insert(AiUsageEntity(
                 model = "test", feature = "test",
                 inputTokens = AiUsageDefaults.DAILY_TOKEN_CAP,
@@ -108,7 +94,6 @@ class AiUsageRepositoryImplTest {
         return AiUsageRepositoryImpl(dao = dao, clock = todayClock)
     }
 
-    /** Minimal in-memory [AiUsageDao] for repository tests. */
     private class TestAiUsageDao : AiUsageDao {
         private val entries = mutableListOf<AiUsageEntity>()
 

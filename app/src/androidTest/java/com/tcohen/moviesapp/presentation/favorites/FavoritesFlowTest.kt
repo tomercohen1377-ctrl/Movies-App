@@ -22,19 +22,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * End-to-end flow tests for the Favorites screen user journey.
- *
- * FavoritesScreen itself requires Hilt injection, so these tests drive the stateless
- * composable components — simulating the empty → populated → remove flow.
- */
 @RunWith(AndroidJUnit4::class)
 class FavoritesFlowTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
-
-    // ── Empty state flow ──────────────────────────────────────────────────────
 
     @Test
     fun favoritesFlow_emptyStateShowsHeadline() {
@@ -59,8 +51,6 @@ class FavoritesFlowTest {
             .onNodeWithText("Tap the heart on any movie to save it here")
             .assertIsDisplayed()
     }
-
-    // ── Populated favorites flow ──────────────────────────────────────────────
 
     @Test
     fun favoritesFlow_favoritedMovieTitleIsDisplayed() {
@@ -115,8 +105,6 @@ class FavoritesFlowTest {
         composeTestRule.onNodeWithText("Dunkirk").assertIsDisplayed()
     }
 
-    // ── Error state flow ──────────────────────────────────────────────────────
-
     @Test
     fun favoritesFlow_errorStateShowsMessage() {
         composeTestRule.setContent {
@@ -147,8 +135,6 @@ class FavoritesFlowTest {
         assertTrue(retried)
     }
 
-    // ── Offline state flow ────────────────────────────────────────────────────
-
     @Test
     fun favoritesFlow_offlineBannerShownWhenOffline() {
         composeTestRule.setContent {
@@ -171,11 +157,9 @@ class FavoritesFlowTest {
         composeTestRule.onNodeWithText("You're offline").assertDoesNotExist()
     }
 
-    // ── State transitions ─────────────────────────────────────────────────────
-
     @Test
     fun favoritesFlow_transitionFromEmptyToPopulated() {
-        // State lives outside setContent so runOnIdle mutations trigger recomposition
+
         var movies by mutableStateOf(emptyList<com.tcohen.moviesapp.domain.model.Movie>())
 
         composeTestRule.setContent {
@@ -191,10 +175,8 @@ class FavoritesFlowTest {
             }
         }
 
-        // Verify empty state is shown first
         composeTestRule.onNodeWithText("No saved movies yet").assertIsDisplayed()
 
-        // Simulate a favorite being added (outside setContent → triggers recomposition)
         composeTestRule.runOnIdle {
             movies = listOf(fakeMovie(title = "Parasite"))
         }

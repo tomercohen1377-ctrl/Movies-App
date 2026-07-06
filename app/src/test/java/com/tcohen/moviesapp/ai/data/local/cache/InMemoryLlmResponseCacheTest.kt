@@ -12,14 +12,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * Unit tests for [InMemoryLlmResponseCache].
- *
- * Phase 0 ships only the in-memory implementation; Phase 2 will add the Room
- * implementation that satisfies the same [LlmResponseCache] interface.
- * The shape of these tests is what Phase 2's `RoomLlmResponseCacheTest`
- * needs to mirror (set/get round-trip + key derivation).
- */
 class InMemoryLlmResponseCacheTest {
 
     @Test
@@ -115,8 +107,6 @@ class InMemoryLlmResponseCacheTest {
         assertEquals(64, hash.length)
         assertEquals(hash, hash.lowercase())
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private fun sampleRequest(
         text: String = "summarise Inception",

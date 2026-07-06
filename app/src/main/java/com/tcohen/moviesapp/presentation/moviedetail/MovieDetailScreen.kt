@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -18,7 +19,11 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,18 +42,43 @@ fun MovieDetailScreen(
     viewModel: MovieDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // Tracks whether the YouTube player has fired its onReady callback.
-    // Until it does (and we have a trailerKey), we keep the loading overlay visible.
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is MovieDetailEffect.ShowSnackbar ->
+                    snackbarHostState.showSnackbar(effect.message)
+            }
+        }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+        ScreenBody(
+            uiState = uiState,
+            viewModel = viewModel,
+            onNavigateBack = onNavigateBack,
+            contentPadding = padding,
+        )
+    }
+}
+
+@Composable
+private fun ScreenBody(
+    uiState: MovieDetailUiState,
+    viewModel: MovieDetailViewModel,
+    onNavigateBack: () -> Unit,
+    contentPadding: PaddingValues,
+) {
     var playerReady by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .padding(contentPadding)
             .background(MaterialTheme.colorScheme.background)
     ) {
         when (val state = uiState) {
-
             is MovieDetailUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -63,14 +93,12 @@ fun MovieDetailScreen(
             }
 
             is MovieDetailUiState.Success -> {
-                // Render content immediately so the YouTube player can warm up in the background.
-                // A loading overlay is shown on top until the player signals it's ready.
                 val isPlayerPending = state.trailerKey != null && !playerReady
 
                 MovieDetailContent(
                     uiState = state,
                     onPlayerReady = { playerReady = true },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 )
 
                 if (isPlayerPending) {
@@ -78,18 +106,17 @@ fun MovieDetailScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.background),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator()
                     }
                 }
 
-                // Favorite FAB — bottom-right, only in Success state
                 val fabColor by animateColorAsState(
                     targetValue = if (state.isFavorite) MaterialTheme.colorScheme.primary
-                                  else MaterialTheme.colorScheme.surface,
+                    else MaterialTheme.colorScheme.surface,
                     animationSpec = tween(durationMillis = FAB_COLOR_ANIMATION_MS),
-                    label = "fav_color"
+                    label = "fav_color",
                 )
                 FloatingActionButton(
                     onClick = { viewModel.processIntent(MovieDetailIntent.ToggleFavorite) },
@@ -97,19 +124,20 @@ fun MovieDetailScreen(
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
                         .padding(16.dp),
-                    containerColor = fabColor
+                    containerColor = fabColor,
                 ) {
                     Icon(
-                        imageVector = if (state.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = if (state.isFavorite) "Remove from favorites" else "Add to favorites",
-                        tint = if (state.isFavorite) Color.White else MaterialTheme.colorScheme.onSurface
+                        imageVector = if (state.isFavorite) Icons.Filled.Favorite
+                        else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (state.isFavorite) "Remove from favorites"
+                        else "Add to favorites",
+                        tint = if (state.isFavorite) Color.White
+                        else MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
         }
 
-        // Back button — overlaid on top-left, always visible regardless of state.
-        // Calls onNavigateBack() directly — no intent/effect needed for simple navigation.
         IconButton(
             onClick = onNavigateBack,
             modifier = Modifier
@@ -121,7 +149,7 @@ fun MovieDetailScreen(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                tint = Color.White
+                tint = Color.White,
             )
         }
     }

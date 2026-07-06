@@ -26,7 +26,7 @@ private const val TAG = "TrailerPlayer"
 fun TrailerPlayerSection(
     trailerKey: String,
     modifier: Modifier = Modifier,
-    /** Called once the YouTube player is initialised (before the video plays). */
+
     onPlayerReady: () -> Unit = {}
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -57,8 +57,6 @@ fun TrailerPlayerSection(
     )
 }
 
-// The YouTube player is an AndroidView/WebView — it cannot render in the Compose preview
-// tool. This preview shows the expected container dimensions and background colour.
 @Preview(showBackground = true)
 @Composable
 private fun TrailerPlayerSectionPreview() {

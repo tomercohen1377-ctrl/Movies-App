@@ -13,16 +13,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
+import com.tcohen.moviesapp.util.NetworkMonitor
 
-/**
- * A slim error-container banner that slides in when [isOffline] is true.
- * Shared by `HomeScreen` and `FavoritesScreen`.
- */
 @Composable
 fun OfflineBanner(
     isOffline: Boolean,
@@ -55,6 +54,15 @@ fun OfflineBanner(
             }
         }
     }
+}
+
+@Composable
+fun OfflineBanner(
+    networkMonitor: NetworkMonitor,
+    modifier: Modifier = Modifier
+) {
+    val online by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
+    OfflineBanner(isOffline = !online, modifier = modifier)
 }
 
 @Preview(showBackground = true)

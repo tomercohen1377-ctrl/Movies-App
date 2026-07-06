@@ -27,22 +27,12 @@ class HomeViewModel @Inject constructor(
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
-    // ── State ─────────────────────────────────────────────────────────────────
-
     private val _state = MutableStateFlow(HomeState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
-
-    // ── Effects ───────────────────────────────────────────────────────────────
 
     private val _effects = Channel<HomeEffect>(Channel.BUFFERED)
     val effects: Flow<HomeEffect> = _effects.receiveAsFlow()
 
-    // ── Paging ────────────────────────────────────────────────────────────────
-
-    /**
-     * Drives the active category for paging. Swapping the value triggers
-     * [flatMapLatest] to cancel the current paging flow and start a fresh one.
-     */
     private val _category = MutableStateFlow(Category.NOW_PLAYING)
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -50,13 +40,9 @@ class HomeViewModel @Inject constructor(
         .flatMapLatest { category -> repository.getMovies(category) }
         .cachedIn(viewModelScope)
 
-    // ── Init ──────────────────────────────────────────────────────────────────
-
     init {
         observeNetworkStatus()
     }
-
-    // ── Intent handler ────────────────────────────────────────────────────────
 
     fun processIntent(intent: HomeIntent) {
         when (intent) {
@@ -64,8 +50,6 @@ class HomeViewModel @Inject constructor(
             is HomeIntent.OpenDetail -> openDetail(intent.movieId)
         }
     }
-
-    // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun selectCategory(category: Category) {
         _category.value = category

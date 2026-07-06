@@ -19,20 +19,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/**
- * Unit tests for [PlotExplainerViewModel].
- *
- * Covers every state transition in the contract plus the cache-hit invariant
- * the plan calls out: a second [PlotExplainerIntent.Explain] on the same
- * movie must NEVER touch the [LlmClient] (cache short-circuit).
- */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlotExplainerViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
-
-    // ── Happy path: streaming → done ──────────────────────────────────────────
 
     @Test
     fun `initial state is Idle`() = runTest {
@@ -69,12 +60,8 @@ class PlotExplainerViewModelTest {
         vm.processIntent(PlotExplainerIntent.Explain(SAMPLE_TITLE, SAMPLE_YEAR, SAMPLE_RUNTIME))
 
         assertEquals(PlotExplainerState.Done("A B C."), vm.state.value)
-        // We cannot SEE intermediate Streaming states after the fact with a
-        // synchronous flow, but the final state proves the collector ran and
-        // concatenated. The Done text matches exactly the expected concatenation.
-    }
 
-    // ── Cache invariant: second click is free ─────────────────────────────────
+    }
 
     @Test
     fun `second Explain on the same movie does NOT call LlmClient (cache hit)`() = runTest {
@@ -114,8 +101,6 @@ class PlotExplainerViewModelTest {
         assertEquals(PlotExplainerState.Done("arrival-summary"), vm.state.value)
     }
 
-    // ── Error path ────────────────────────────────────────────────────────────
-
     @Test
     fun `streaming that emits an Error transitions to Error state`() = runTest {
         val script = flowOf(
@@ -144,20 +129,12 @@ class PlotExplainerViewModelTest {
         vm.processIntent(PlotExplainerIntent.Explain(SAMPLE_TITLE, SAMPLE_YEAR, SAMPLE_RUNTIME))
         assertTrue(vm.state.value is PlotExplainerState.Error)
 
-        // On the same VM, retry should drive a new streaming pass — but
-        // because the second scripted stream is also the error one, we
-        // re-enter Error. The important assertion is that the ViewModel
-        // does not stop processing on the first error.
-        // (A success-on-retry case is covered by Streaming-once tests.)
     }
-
-    // ── Phase 2: daily token cap ──────────────────────────────────────────────
 
     @Test
     fun `Explain never streams when daily cap is exhausted`() = runTest {
         val tracker = FakeAiUsageTracker().also {
-            // Seed enough tokens to push the day over the cap so
-            // guardUnderDailyCap() returns Error.
+
             it.seedUsedTokens(
                 inputTokens = 250_001,
                 outputTokens = 0
@@ -177,8 +154,6 @@ class PlotExplainerViewModelTest {
         val finalState = vm.state.value
         assertTrue("expected Error but was $finalState", finalState is PlotExplainerState.Error)
     }
-
-    // ── Cancel and reset ──────────────────────────────────────────────────────
 
     @Test
     fun `Cancel from Streaming returns to Idle`() = runTest {
@@ -219,8 +194,6 @@ class PlotExplainerViewModelTest {
         assertEquals(PlotExplainerState.Idle, vm.state.value)
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private fun createViewModel(
         script: Flow<NetworkResult<String>> = flowOf(),
         scriptByCall: List<Flow<NetworkResult<String>>> = emptyList(),
@@ -244,10 +217,6 @@ class PlotExplainerViewModelTest {
     }
 }
 
-/**
- * LlmClient double that replays a pre-scripted [Flow]. Records every call to
- * [stream] so a test can assert cache invariants.
- */
 private class ScriptedLlmClient(
     private val defaultScript: Flow<NetworkResult<String>>,
     private val scriptsByCall: List<Flow<NetworkResult<String>>> = emptyList()
@@ -265,12 +234,6 @@ private class ScriptedLlmClient(
     }
 }
 
-/**
- * In-memory stand-in for `AiUsageRepositoryImpl`. Holds a fake DAO and exposes
- * a `.asRepository` property of the right concrete type — the production VM
- * constructor is typed against `AiUsageRepositoryImpl` (with `@Inject`),
- * so we hand it the wrapped instance.
- */
 internal class FakeAiUsageTracker {
     private val fakeDao = FakeAiUsageDao()
 
@@ -278,19 +241,15 @@ internal class FakeAiUsageTracker {
         com.tcohen.moviesapp.ai.data.repository.AiUsageRepositoryImpl(
             dao = fakeDao,
             clock = object : com.tcohen.moviesapp.ai.data.repository.TimeProvider {
-                override fun startOfTodayMillis(): Long = 0L  // epoch start → everything is "today"
+                override fun startOfTodayMillis(): Long = 0L
             }
         )
 
-    /** Pre-load usage rows as if the user already burned through today. */
     fun seedUsedTokens(inputTokens: Int, outputTokens: Int) {
         fakeDao.seedUsedTokens(inputTokens, outputTokens)
     }
 }
 
-/**
- * In-memory [AiUsageDao] used by [FakeAiUsageTracker].
- */
 private class FakeAiUsageDao : com.tcohen.moviesapp.ai.data.local.dao.AiUsageDao {
     private val entries = mutableListOf<com.tcohen.moviesapp.ai.data.local.entity.AiUsageEntity>()
 
@@ -316,7 +275,7 @@ private class FakeAiUsageDao : com.tcohen.moviesapp.ai.data.local.dao.AiUsageDao
         entries += com.tcohen.moviesapp.ai.data.local.entity.AiUsageEntity(
             model = "test", feature = "test",
             inputTokens = inputTokens, outputTokens = outputTokens,
-            timestamp = 0L  // at "today start" → counts toward today
+            timestamp = 0L
         )
     }
 }

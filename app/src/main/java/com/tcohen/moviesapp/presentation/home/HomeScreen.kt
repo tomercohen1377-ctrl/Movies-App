@@ -38,7 +38,6 @@ fun HomeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val movies = viewModel.moviesFlow.collectAsLazyPagingItems()
 
-    // One-shot effects
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -49,17 +48,12 @@ fun HomeScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // Offline banner — shown only when device has no connectivity
-        OfflineBanner(isOffline = state.isOffline)
-
-        // Category filter chip row
         CategoryFilterRow(
             selectedCategory = state.selectedCategory,
             onCategorySelected = { viewModel.processIntent(HomeIntent.SelectCategory(it)) },
             modifier = Modifier.padding(vertical = 8.dp)
         )
 
-        // Movie grid — driven by Paging 3
         when (val refreshState = movies.loadState.refresh) {
             is LoadState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -80,8 +74,6 @@ fun HomeScreen(
                             onClick = { viewModel.processIntent(HomeIntent.OpenDetail(movie.id)) }
                         )
                     } else {
-                        // Lightweight colour placeholder while the page loads.
-                        // Avoids running continuous shimmer animations on 20+ cells simultaneously.
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -96,8 +88,6 @@ fun HomeScreen(
     }
 }
 
-// HomeScreen itself requires Hilt injection. This preview shows the shell UI
-// (offline banner + filter chips + loading spinner) with hardcoded state.
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenLoadingPreview() {

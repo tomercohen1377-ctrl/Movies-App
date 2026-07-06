@@ -38,13 +38,10 @@ class MoviePagingSource(
 
             val movies = response.results.map { it.toDomain() }
 
-            // On page 1, clear the old cache before inserting fresh data so stale
-            // entries don't linger alongside the new results.
             if (page == PagingDefaults.STARTING_PAGE_INDEX) {
                 movieDao.deleteByCategory(category.name)
             }
 
-            // Cache to Room so offline browsing works later.
             movieDao.insertAll(movies.map { it.toEntity(category, page) })
 
             LoadResult.Page(
@@ -70,7 +67,7 @@ class MoviePagingSource(
                 nextKey = if (page >= lastCachedPage) null else page + 1
             )
         } else {
-            // No cached data for this page while offline.
+
             LoadResult.Error(NetworkUnavailableException())
         }
     }

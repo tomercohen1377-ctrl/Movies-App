@@ -19,8 +19,6 @@ class MoviePosterImageTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    // ── Rendering ─────────────────────────────────────────────────────────────
-
     @Test
     fun moviePosterImage_isDisplayed() {
         composeTestRule.setContent {
@@ -54,7 +52,6 @@ class MoviePosterImageTest {
             }
         }
 
-        // No crash — empty/null content description renders without issue
         composeTestRule.onNodeWithContentDescription("").assertDoesNotExist()
     }
 
@@ -72,7 +69,6 @@ class MoviePosterImageTest {
             }
         }
 
-        // The node is still present even when no image loads (shows surface-variant background)
         composeTestRule
             .onNodeWithContentDescription("Placeholder poster")
             .assertIsDisplayed()

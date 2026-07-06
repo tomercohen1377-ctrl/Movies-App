@@ -12,16 +12,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 
-/**
- * Loads a TMDB image URL via Coil.
- *
- * Uses [AsyncImage] (not [coil.compose.SubcomposeAsyncImage]) so that no extra
- * subcomposition occurs per list cell — this keeps the grid scroll smooth.
- *
- * A neutral surface-variant background visible while the image downloads acts as
- * a lightweight placeholder without triggering additional animation frames.
- * Crossfade is configured on the global `ImageLoader` so it applies here automatically.
- */
 @Composable
 fun MoviePosterImage(
     imageUrl: String?,
@@ -41,7 +31,7 @@ fun MoviePosterImage(
 @Composable
 private fun MoviePosterImagePreview() {
     MoviesAppTheme {
-        // Shows the surface-variant placeholder colour (no real URL in preview)
+
         MoviePosterImage(
             imageUrl = null,
             contentDescription = "Movie poster",

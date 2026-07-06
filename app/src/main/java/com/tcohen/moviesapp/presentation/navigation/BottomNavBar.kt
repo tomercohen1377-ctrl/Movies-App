@@ -15,9 +15,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 
-/**
- * Bottom navigation bar with exactly 2 tabs: Home and Favorites.
- */
 @Composable
 fun BottomNavBar(navController: NavController) {
     val tabs = listOf(
@@ -43,7 +40,7 @@ fun BottomNavBar(navController: NavController) {
                 onClick = {
                     if (currentRoute != item.screen.route) {
                         navController.navigate(item.screen.route) {
-                            // Pop up to the start destination to avoid building a large back stack
+
                             popUpTo(Screen.Home.route) {
                                 saveState = true
                             }

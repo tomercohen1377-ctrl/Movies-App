@@ -27,34 +27,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.paging.compose.LazyPagingItems
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.presentation.common.MovieCard
 import com.tcohen.moviesapp.presentation.common.MovieGrid
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 
-/**
- * Paginated 2-column favorites grid backed by [MovieGrid].
- *
- * Each card is wrapped in a [SwipeToDismissBox] that triggers [FavoritesIntent.RemoveFavorite]
- * when the user swipes end-to-start. Swipe is disabled when [isOffline] is `true`.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesGrid(
-    favorites: LazyPagingItems<Movie>,
-    isOffline: Boolean,
+    movies: List<Movie>,
     onIntent: (FavoritesIntent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    MovieGrid(movies = favorites, modifier = modifier) { movie ->
-        if (movie == null) return@MovieGrid
-
+    MovieGrid(movies = movies, modifier = modifier) { movie ->
         val dismissState = rememberSwipeToDismissBoxState()
 
-        // Trigger removal only when online — swipe is a write operation.
         LaunchedEffect(dismissState.currentValue) {
-            if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart && !isOffline) {
+            if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
                 onIntent(FavoritesIntent.RemoveFavorite(movie))
             }
         }
@@ -62,8 +51,7 @@ fun FavoritesGrid(
         SwipeToDismissBox(
             state = dismissState,
             enableDismissFromStartToEnd = false,
-            // Swipe is fully disabled when offline so the card stays put.
-            enableDismissFromEndToStart = !isOffline,
+            enableDismissFromEndToStart = true,
             backgroundContent = {
                 Box(
                     modifier = Modifier
@@ -89,7 +77,6 @@ fun FavoritesGrid(
     }
 }
 
-/** Full-screen placeholder shown when the favorites list is empty. */
 @Composable
 internal fun EmptyFavoritesState(modifier: Modifier = Modifier) {
     Box(

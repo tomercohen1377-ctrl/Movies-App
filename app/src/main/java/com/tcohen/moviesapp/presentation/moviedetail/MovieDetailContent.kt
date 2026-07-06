@@ -19,15 +19,6 @@ import com.tcohen.moviesapp.presentation.common.TrailerPlayerSection
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 import com.tcohen.moviesapp.util.TmdbImageUrl
 
-/**
- * Scrollable body of the movie detail screen — trailer/backdrop at the top followed by
- * [MovieMetadata] and the AI plot-explainer [PlotExplainerSection]. Extracted so it can
- * be rendered behind the loading overlay while the YouTube player warms up, without
- * cluttering [MovieDetailScreen].
- *
- * @param uiState The [MovieDetailUiState.Success] to render.
- * @param onPlayerReady Callback fired once the YouTube player has initialised.
- */
 @Composable
 fun MovieDetailContent(
     uiState: MovieDetailUiState.Success,
@@ -36,7 +27,6 @@ fun MovieDetailContent(
 ) {
     Column(modifier = modifier.verticalScroll(rememberScrollState())) {
 
-        // Trailer player OR backdrop/poster image at the very top
         if (uiState.trailerKey != null) {
             TrailerPlayerSection(
                 trailerKey = uiState.trailerKey,
@@ -54,12 +44,8 @@ fun MovieDetailContent(
             )
         }
 
-        // All textual and visual metadata
         MovieMetadata(movie = uiState.movie)
 
-        // Phase 0+ — AI plot summary section. Owns its own ViewModel and
-        // state machine; the surrounding `MovieDetailViewModel` is unaware
-        // of it (separation of concerns).
         val releaseYear = uiState.movie.releaseDate
             .take(RELEASE_YEAR_CHAR_COUNT)
             .toIntOrNull()
@@ -69,12 +55,10 @@ fun MovieDetailContent(
             runtimeMinutes = uiState.movie.runtime,
         )
 
-        // Bottom spacer so the FAB doesn't overlap the last line of text
         Spacer(modifier = Modifier.height(88.dp))
     }
 }
 
-/** Number of leading characters in `Movie.releaseDate` that form the 4-digit year. */
 private const val RELEASE_YEAR_CHAR_COUNT = 4
 
 @Preview(showBackground = true)

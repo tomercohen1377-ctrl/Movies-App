@@ -23,11 +23,6 @@ private fun NetworkErrorFooterPreview() {
     }
 }
 
-/**
- * Inline footer shown at the bottom of the movie list when paging hits a
- * `NetworkUnavailableException` — i.e. the user scrolled past the cached pages
- * while offline. The list above remains scrollable.
- */
 @Composable
 fun NetworkErrorFooter(
     onRetry: () -> Unit,

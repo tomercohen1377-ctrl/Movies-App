@@ -7,12 +7,6 @@ import com.tcohen.moviesapp.ai.domain.model.ToolInvocation
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * Wire-format request body for `POST /chat/completions` against an
- * OpenAI-compatible provider (Gemini, OpenAI, Groq, OpenRouter, Together).
- *
- * Field names match the OpenAI v1 spec so swapping providers = swap base URL + key.
- */
 @Serializable
 internal data class ChatCompletionRequestDto(
     val model: String,
@@ -41,7 +35,7 @@ internal data class ToolCallDto(
 @Serializable
 internal data class ToolCallFunctionDto(
     val name: String,
-    /** JSON-encoded arguments object the model produced. */
+
     val arguments: String
 )
 
@@ -71,10 +65,6 @@ internal data class ToolParameterSchemaDto(
     val description: String? = null
 )
 
-/**
- * Non-streaming completion response. Mirrors the OpenAI chat completion shape;
- * the assistant message lives under `choices[0].message`.
- */
 @Serializable
 internal data class ChatCompletionResponseDto(
     val id: String? = null,
@@ -96,11 +86,6 @@ internal data class AssistantMessageDto(
     @SerialName("tool_calls") val toolCalls: List<ToolCallDto>? = null
 )
 
-/**
- * One chunk from a streaming response. The assistant's incremental text lives
- * under `choices[0].delta.content`; tool invocations arrive complete (not
- * incremental) on `choices[0].delta.tool_calls`.
- */
 @Serializable
 internal data class ChatCompletionChunkDto(
     val id: String? = null,
@@ -122,11 +107,6 @@ internal data class AssistantDeltaDto(
     @SerialName("tool_calls") val toolCalls: List<ToolCallDto>? = null
 )
 
-/**
- * Adapter: domain [ChatMessage] → wire DTO. [ChatRole.TOOL] messages
- * carry `content` + `tool_call_id`; [ChatRole.ASSISTANT] messages carry
- * optional `tool_calls`. Other roles send `content` only.
- */
 internal fun ChatMessage.toDto(): ChatMessageDto = when (role) {
     ChatRole.TOOL -> ChatMessageDto(
         role = "tool",
@@ -154,13 +134,6 @@ internal fun ToolInvocation.toDto(): ToolCallDto = ToolCallDto(
     function = ToolCallFunctionDto(name = toolName, arguments = rawArgs)
 )
 
-/**
- * Convert a domain [ChatRequest] to a wire-format DTO.
- *
- * `tools` is bound by [OpenAiCompatibleLlmClient] at call time, not here,
- * because tool schemas are derived from the live [ToolRegistry] and the
- * caller knows which subset to expose.
- */
 internal fun ChatRequest.toDto(stream: Boolean): ChatCompletionRequestDto = ChatCompletionRequestDto(
     model = model,
     messages = messages.map { it.toDto() },

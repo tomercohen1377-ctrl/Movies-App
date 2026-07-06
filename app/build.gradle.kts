@@ -27,15 +27,6 @@ android {
         buildConfigField("String", "TMDB_BASE_URL", "\"https://api.themoviedb.org/3/\"")
         buildConfigField("String", "TMDB_IMAGE_BASE_URL", "\"https://image.tmdb.org/t/p/\"")
 
-        // TMDB account credentials for favorites server sync.
-        // TMDB_ACCOUNT_ID: use "me" (works with v4 Bearer read token for GET)
-        //   or replace with your numeric TMDB account ID for v3 session auth.
-        // TMDB_SESSION_ID: required for write operations (add/remove favorite).
-        //   Obtain via the TMDB v3 authentication flow:
-        //   GET /authentication/token/new → authorize → POST /authentication/session/new
-        buildConfigField("String", "TMDB_ACCOUNT_ID", "\"me\"")
-        buildConfigField("String", "TMDB_SESSION_ID", "\"\"")
-
         // Phase 0 — AI/LLM provider. Empty by default; drop in your Gemini key
         // from https://aistudio.google.com to enable. Without a key, every
         // LLM call fails fast with ApiError.UNAUTHORIZED and the rest of the
@@ -43,6 +34,14 @@ android {
         buildConfigField("String", "GEMINI_API_KEY", "\"\"")
         buildConfigField("String", "LLM_BASE_URL", "\"https://generativelanguage.googleapis.com/v1beta/openai/\"")
         buildConfigField("String", "LLM_DEFAULT_MODEL", "\"gemini-2.5-flash\"")
+
+        // Server favorites backend.
+        // SERVER_BASE_URL — the live Kotlin server. Override in local.properties
+        // to point at a localhost:8080 instance during integration testing.
+        // SERVER_SMOKE_TEST_ENABLED — flips the live-server FavoritesServerJourneyTest
+        // on; default off so it never runs on CI without an explicit opt-in.
+        buildConfigField("String",  "SERVER_BASE_URL",            "\"https://moviesapp-server-production.up.railway.app/\"")
+        buildConfigField("Boolean", "SERVER_SMOKE_TEST_ENABLED",  "false")
     }
 
     buildTypes {
@@ -128,6 +127,11 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+
+    // Encrypted shared preferences — Phase 2 of the server migration needs
+    // Android Keystore-backed storage for the refresh-token password. The
+    // access token itself stays in plain DataStore (short-lived).
+    implementation(libs.androidx.security.crypto)
 
     // Debug tooling
     debugImplementation(libs.androidx.ui.tooling)

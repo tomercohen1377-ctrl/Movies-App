@@ -17,8 +17,6 @@ class ErrorViewTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    // ── Content display ───────────────────────────────────────────────────────
-
     @Test
     fun errorView_displaysProvidedMessage() {
         composeTestRule.setContent {
@@ -60,8 +58,6 @@ class ErrorViewTest {
 
         composeTestRule.onNodeWithText("No internet connection").assertIsDisplayed()
     }
-
-    // ── Retry interaction ─────────────────────────────────────────────────────
 
     @Test
     fun errorView_retryButton_invokesCallback() {

@@ -32,7 +32,6 @@ private fun ErrorViewPreview() {
     }
 }
 
-/** Full-screen error state with an icon, message, and retry button. */
 @Composable
 fun ErrorView(
     message: String,

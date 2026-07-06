@@ -15,8 +15,6 @@ class OfflineBannerTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    // ── Visible when offline ──────────────────────────────────────────────────
-
     @Test
     fun offlineBanner_showsTextWhenOffline() {
         composeTestRule.setContent {
@@ -28,8 +26,6 @@ class OfflineBannerTest {
         composeTestRule.onNodeWithText("You're offline").assertIsDisplayed()
     }
 
-    // ── Hidden when online ────────────────────────────────────────────────────
-
     @Test
     fun offlineBanner_hiddenWhenOnline() {
         composeTestRule.setContent {
@@ -38,7 +34,6 @@ class OfflineBannerTest {
             }
         }
 
-        // AnimatedVisibility removes the node from the tree when not visible
         composeTestRule.onNodeWithText("You're offline").assertDoesNotExist()
     }
 }

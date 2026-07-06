@@ -7,30 +7,42 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.tcohen.moviesapp.presentation.common.OfflineBanner
 import com.tcohen.moviesapp.presentation.favorites.FavoritesScreen
 import com.tcohen.moviesapp.presentation.home.HomeScreen
 import com.tcohen.moviesapp.presentation.moviedetail.MovieDetailScreen
+import com.tcohen.moviesapp.util.NetworkMonitor
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
 @Composable
 fun AppNavGraph(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    networkMonitor: NetworkMonitor = hiltViewModel<NetworkMonitorHolder>().monitor
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val showBottomBar = currentRoute in setOf(
+    val showChrome = currentRoute in setOf(
         Screen.Home.route,
         Screen.Favorites.route
     )
 
     Scaffold(
+        topBar = {
+            if (showChrome) {
+                OfflineBanner(networkMonitor = networkMonitor)
+            }
+        },
         bottomBar = {
-            if (showBottomBar) {
+            if (showChrome) {
                 BottomNavBar(navController = navController)
             }
         }
@@ -63,15 +75,12 @@ fun AppNavGraph(
             composable(
                 route = Screen.MovieDetail.routeWithArgs,
                 arguments = Screen.MovieDetail.arguments,
-                // Slide in from the right when navigating to detail
                 enterTransition = {
                     slideInHorizontally(initialOffsetX = { fullWidth -> fullWidth })
                 },
-                // Slide out to the right when popping back
                 popExitTransition = {
                     slideOutHorizontally(targetOffsetX = { fullWidth -> fullWidth })
                 },
-                // Keep the host screens still (no exit animation when pushing detail)
                 exitTransition = null,
                 popEnterTransition = null
             ) {
@@ -82,3 +91,8 @@ fun AppNavGraph(
         }
     }
 }
+
+@HiltViewModel
+class NetworkMonitorHolder @Inject constructor(
+    val monitor: NetworkMonitor,
+) : ViewModel()

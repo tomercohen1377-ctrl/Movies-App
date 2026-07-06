@@ -17,8 +17,6 @@ class NetworkErrorFooterTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    // ── Content display ───────────────────────────────────────────────────────
-
     @Test
     fun networkErrorFooter_showsOfflineMessage() {
         composeTestRule.setContent {
@@ -43,8 +41,6 @@ class NetworkErrorFooterTest {
         composeTestRule.onNodeWithText("Retry").assertIsDisplayed()
     }
 
-    // ── Retry interaction ─────────────────────────────────────────────────────
-
     @Test
     fun networkErrorFooter_retryButton_invokesCallback() {
         var retried = false
@@ -68,7 +64,6 @@ class NetworkErrorFooterTest {
             }
         }
 
-        // No click → callback not invoked
         assertTrue(!retried)
     }
 }

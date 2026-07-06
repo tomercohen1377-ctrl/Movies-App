@@ -12,12 +12,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Tests for [MovieDetailContent] — the scrollable body of the detail screen.
- *
- * The YouTube player requires a real WebView and cannot be tested here.
- * These tests focus on the no-trailer path (backdrop/poster image + metadata).
- */
 @RunWith(AndroidJUnit4::class)
 class MovieDetailContentTest {
 
@@ -36,8 +30,6 @@ class MovieDetailContentTest {
         trailerKey = trailerKey,
         isFavorite = isFavorite
     )
-
-    // ── Metadata always renders ───────────────────────────────────────────────
 
     @Test
     fun movieDetailContent_showsMovieTitle() {
@@ -78,11 +70,8 @@ class MovieDetailContentTest {
             }
         }
 
-        // Overview is part of MovieMetadata — check it's present
         composeTestRule.onNodeWithText("Overview 1", substring = true).assertIsDisplayed()
     }
-
-    // ── No-trailer path uses backdrop/poster image ────────────────────────────
 
     @Test
     fun movieDetailContent_noTrailer_showsBackdropImage() {
@@ -96,13 +85,8 @@ class MovieDetailContentTest {
             }
         }
 
-        // AsyncImage uses the movie title as contentDescription.
-        // Both the backdrop and the thumbnail carry the same description, so we assert
-        // that at least one of them is displayed.
         composeTestRule.onAllNodesWithContentDescription("Arrival")[0].assertIsDisplayed()
     }
-
-    // ── onPlayerReady callback can be invoked ─────────────────────────────────
 
     @Test
     fun movieDetailContent_onPlayerReady_canBeInvoked() {
@@ -116,7 +100,6 @@ class MovieDetailContentTest {
             }
         }
 
-        // No trailer → player never becomes ready automatically, but callback is wired
-        assertTrue(!playerReady) // baseline — not called without a trailer
+        assertTrue(!playerReady)
     }
 }
