@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.tcohen.moviesapp.data.local.dao.FavoriteDao
 import com.tcohen.moviesapp.data.mapper.toDomain
+import com.tcohen.moviesapp.data.mapper.toFavoriteEntity
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.util.NetworkMonitor
@@ -11,13 +12,29 @@ import com.tcohen.moviesapp.util.NetworkMonitor
 /**
  * [PagingSource] for the favorites list.
  *
- * **Online**: fetches pages directly from `GET /account/{account_id}/favorite/movies`.
- * Does **not** write results back to Room to avoid triggering an infinite reload loop
- * (any Room write would re-invalidate this source via the ViewModel's refresh trigger).
+ * **Online**: fetches pages from `GET /account/{account_id}/favorite/movies` and
+ * **mirrors them into Room** via [FavoriteDao.insertAll]. The Room write-through is
+ * essential — without it, `MovieRepository.observeIsFavorite(id)` would lie about
+ * server-side favorites on a fresh install (Room is empty, but the Favorites grid
+ * is showing the server's truth via the API call), so the Detail screen FAB would
+ * not reflect the user's actual favorites. Insertions use `REPLACE` strategy so
+ * re-syncs are idempotent — re-fetching page N simply overwrites the same rows.
  *
- * **Offline**: reads from the local Room favorites table using an offset-based approach
- * (`savedAt DESC`, page size = [PagingDefaults.PAGE_SIZE]). The cache is populated whenever
- * the user toggles a favorite (add or remove) via `MovieRepository.toggleFavorite`.
+ * We intentionally do **not** trigger [MovieRepository]'s `favoriteChanges` flow
+ * from this write-through: that signal is reserved for user-initiated toggles so
+ * the [com.tcohen.moviesapp.presentation.favorites.FavoritesViewModel] pager
+ * doesn't ping-pong on every successful sync.
+ *
+ * **Offline**: reads from the local Room favorites table using an offset-based
+ * approach (`savedAt DESC`, page size = [PagingDefaults.PAGE_SIZE]). The cache is
+ * populated by both user toggles (`MovieRepository.toggleFavorite`) AND by the
+ * online sync path here — the two write paths converge into the same Room table.
+ *
+ * **Note on the offline check inside [load]:** As in [MoviePagingSource], the
+ * `networkMonitor.isCurrentlyOnline()` call is a **data-source routing decision**,
+ * not a duplicate of [com.tcohen.moviesapp.data.remote.api.SafeApiCaller]'s guard.
+ * Server errors on the online path must surface to the UI — silently falling back
+ * to Room for every API failure would hide real 5xx issues.
  */
 class FavoritesPagingSource(
     private val apiService: TmdbApiService,
@@ -44,6 +61,10 @@ class FavoritesPagingSource(
                 page = page
             )
             val movies = response.results.map { dto -> dto.toDomain() }
+
+            // Mirror into Room so `observeIsFavorite(id)` sees server-side favorites.
+            // REPLACE conflict strategy → re-syncs are idempotent.
+            favoriteDao.insertAll(movies.map { it.toFavoriteEntity() })
 
             LoadResult.Page(
                 data = movies,

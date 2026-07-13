@@ -11,6 +11,16 @@ import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.util.NetworkMonitor
 import com.tcohen.moviesapp.util.NetworkUnavailableException
 
+/**
+ * [PagingSource] for the category movie lists (Now Playing / Top Rated / Upcoming).
+ *
+ * **Note on the offline check inside [load]:** The `networkMonitor.isCurrentlyOnline()`
+ * call here is *not* a duplicate of [com.tcohen.moviesapp.data.remote.api.SafeApiCaller]'s
+ * built-in offline guard — it is a **data-source routing decision**. We need to
+ * distinguish "no internet → serve stale cache" from "online but TMDB returned
+ * 5xx → show the error UI". A blind fallback to cache on every API error would hide
+ * server failures behind stale data. The check therefore stays in this class.
+ */
 class MoviePagingSource(
     private val apiService: TmdbApiService,
     private val movieDao: MovieDao,

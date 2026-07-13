@@ -7,8 +7,8 @@ import com.tcohen.moviesapp.data.local.dao.FavoriteDao
 import com.tcohen.moviesapp.data.local.dao.MovieDao
 import com.tcohen.moviesapp.data.mapper.toDomain
 import com.tcohen.moviesapp.data.mapper.toFavoriteEntity
+import com.tcohen.moviesapp.data.remote.api.SafeApiCaller
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
-import com.tcohen.moviesapp.data.remote.api.safeApiCall
 import com.tcohen.moviesapp.data.remote.dto.FavoriteRequest
 import com.tcohen.moviesapp.data.remote.dto.VideoResponse
 import com.tcohen.moviesapp.data.remote.paging.FavoritesPagingSource
@@ -31,7 +31,14 @@ class MovieRepositoryImpl @Inject constructor(
     private val apiService: TmdbApiService,
     private val movieDao: MovieDao,
     private val favoriteDao: FavoriteDao,
+    /**
+     * Pass-through to [MoviePagingSource] and [FavoritesPagingSource], which use it to
+     * **route** between network and Room cache as a data source (not to pre-check
+     * individual API calls). All API pre-checks happen inside [safeApiCaller] now, which
+     * is why [networkMonitor] is no longer read directly anywhere in this class.
+     */
     private val networkMonitor: NetworkMonitor,
+    private val safeApiCaller: SafeApiCaller,
     @Named("tmdbAccountId") private val accountId: String,
     @Named("tmdbSessionId") private val sessionId: String
 ) : MovieRepository {
@@ -59,12 +66,10 @@ class MovieRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getMovieDetail(movieId: Int): NetworkResult<MovieDetail> =
-        safeApiCall { apiService.getMovieDetails(movieId).toDomain() }
+        safeApiCaller { apiService.getMovieDetails(movieId).toDomain() }
 
-    override suspend fun getTrailer(movieId: Int): NetworkResult<VideoResult?> {
-        // Offline fast-path — no point attempting a network call with no connectivity.
-        if (!networkMonitor.isCurrentlyOnline()) return NetworkResult.Success(null)
-        return safeApiCall {
+    override suspend fun getTrailer(movieId: Int): NetworkResult<VideoResult?> =
+        safeApiCaller {
             apiService.getMovieVideos(movieId).results
                 .filter { it.site == VIDEO_SITE_YOUTUBE && it.type == VIDEO_TYPE_TRAILER }
                 .sortedWith(
@@ -74,7 +79,10 @@ class MovieRepositoryImpl @Inject constructor(
                 .firstOrNull()
                 ?.toDomain()
         }
-    }
+    // NB: Offline behaviour is handled entirely by `safeApiCaller`'s built-in check.
+    // When offline, the view-model collapses the resulting `Error(NO_CONNECTION)` into
+    // `trailerKey = null` (`MovieDetailViewModel.loadDetail`), which is the same UX as
+    // the previous explicit `Success(null)` early-return.
 
     /**
      * Toggles the favorite state for [movie].
@@ -82,8 +90,11 @@ class MovieRepositoryImpl @Inject constructor(
      * **Local update** happens immediately (optimistic UI).
      *
      * **Server sync**: `POST /account/{account_id}/favorite` with `favorite = true/false`.
+     * The sync is best-effort — `safeApiCaller` short-circuits the call when offline and
+     * swallows any HTTP / IO failure. The result is intentionally discarded because the
+     * local Room state is the source of truth and is never rolled back on failure.
      *
-     * Server failures are silently ignored — local state is never rolled back.
+     * The sync is skipped entirely when no TMDB account ID is configured.
      */
     override suspend fun toggleFavorite(movie: Movie) {
         val isCurrentlyFavorite = favoriteDao.isFavorite(movie.id)
@@ -95,20 +106,16 @@ class MovieRepositoryImpl @Inject constructor(
             favoriteDao.insert(movie.toFavoriteEntity())
         }
 
-        // 2. Best-effort server sync.
-        // Mirrors the GET approach: always attempt when online, passing session_id only when
-        // configured (null otherwise). A 401 or any other failure is silently swallowed —
-        // local state is already updated and is never rolled back.
-        if (networkMonitor.isCurrentlyOnline() && accountId.isNotEmpty()) {
-            val sessionIdOrNull = sessionId.takeIf { it.isNotEmpty() }
-            try {
+        // 2. Best-effort server sync. SafeApiCaller abstracts the offline check and
+        //    exception handling — the previous inline `isCurrentlyOnline() && … try/catch`
+        //    block was a duplicate of what SafeApiCaller already owns.
+        if (accountId.isNotEmpty()) {
+            safeApiCaller {
                 apiService.markFavorite(
                     accountId = accountId,
-                    sessionId = sessionIdOrNull,
+                    sessionId = sessionId.takeIf { it.isNotEmpty() },
                     body = FavoriteRequest(mediaId = movie.id, favorite = !isCurrentlyFavorite)
                 )
-            } catch (_: Exception) {
-                // Server sync failure — local state already updated, nothing to undo.
             }
         }
 

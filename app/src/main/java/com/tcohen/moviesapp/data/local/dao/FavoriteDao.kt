@@ -13,6 +13,19 @@ interface FavoriteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(favorite: FavoriteEntity)
 
+    /**
+     * Bulk insert. Used by [FavoritesPagingSource] to mirror the server's full
+     * favorites list into Room on every successful online page fetch, so:
+     *  - `MovieRepository.observeIsFavorite(id)` is consistent with what's shown
+     *    in the Favorites grid (fixes the Detail-screen FAB on a fresh install).
+     *  - the offline cache path is populated for the same set of movies.
+     *
+     * `REPLACE` strategy means re-syncs are idempotent — re-fetching the same page
+     * simply overwrites the same rows.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(favorites: List<FavoriteEntity>)
+
     @Query("DELETE FROM favorites WHERE id = :movieId")
     suspend fun deleteById(movieId: Int)
 

@@ -4,12 +4,15 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingSource
 import androidx.paging.testing.TestPager
 import com.tcohen.moviesapp.data.local.dao.FavoriteDao
+import com.tcohen.moviesapp.data.local.entity.FavoriteEntity
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
 import com.tcohen.moviesapp.domain.model.Movie
 import com.tcohen.moviesapp.fakeFavoriteEntity
 import com.tcohen.moviesapp.fakeMovieListResponse
 import com.tcohen.moviesapp.util.NetworkMonitor
 import io.mockk.coEvery
+import io.mockk.coJustRun
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -26,6 +29,13 @@ class FavoritesPagingSourceTest {
 
     private val pagingConfig = PagingConfig(pageSize = 20, enablePlaceholders = false)
 
+    private fun stubInsertAll() {
+        // The online path now writes the page through to Room via insertAll.
+        // Default behaviour in tests: nothing happens, but the call must be stubbed
+        // so the mock doesn't fail.
+        coJustRun { favoriteDao.insertAll(any()) }
+    }
+
     private fun createSource() = FavoritesPagingSource(
         apiService = apiService,
         favoriteDao = favoriteDao,
@@ -39,6 +49,7 @@ class FavoritesPagingSourceTest {
     @Test
     fun `online - first page has null prevKey`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
+        stubInsertAll()
         coEvery { apiService.getFavoriteMovies(any(), any(), 1) } returns
             fakeMovieListResponse(page = 1, totalPages = 3)
 
@@ -51,6 +62,7 @@ class FavoritesPagingSourceTest {
     @Test
     fun `online - first page has correct nextKey when more pages exist`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
+        stubInsertAll()
         coEvery { apiService.getFavoriteMovies(any(), any(), 1) } returns
             fakeMovieListResponse(page = 1, totalPages = 3)
 
@@ -63,6 +75,7 @@ class FavoritesPagingSourceTest {
     @Test
     fun `online - last page has null nextKey`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
+        stubInsertAll()
         coEvery { apiService.getFavoriteMovies(any(), any(), 2) } returns
             fakeMovieListResponse(page = 2, totalPages = 2)
 
@@ -77,6 +90,7 @@ class FavoritesPagingSourceTest {
     @Test
     fun `online - movies are returned from response`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
+        stubInsertAll()
         coEvery { apiService.getFavoriteMovies(any(), any(), 1) } returns
             fakeMovieListResponse(page = 1, totalPages = 1, count = 5)
 
@@ -89,6 +103,7 @@ class FavoritesPagingSourceTest {
     @Test
     fun `online - API error returns LoadResult Error`() = runTest {
         every { networkMonitor.isCurrentlyOnline() } returns true
+        // No stubInsertAll() here — the API throws before insertAll is reached.
         coEvery { apiService.getFavoriteMovies(any(), any(), any()) } throws
             RuntimeException("Network failure")
 
@@ -98,6 +113,50 @@ class FavoritesPagingSourceTest {
         )
 
         assertTrue(result is PagingSource.LoadResult.Error)
+    }
+
+    // ── Room write-through (regression fix for Detail-screen FAB) ─────────────
+
+    @Test
+    fun `online - first page is mirrored into Room via insertAll`() = runTest {
+        every { networkMonitor.isCurrentlyOnline() } returns true
+        coEvery { apiService.getFavoriteMovies(any(), any(), 1) } returns
+            fakeMovieListResponse(page = 1, totalPages = 1, count = 5)
+        val capturedEntities = mutableListOf<List<FavoriteEntity>>()
+        coEvery { favoriteDao.insertAll(capture(capturedEntities)) } returns Unit
+
+        TestPager(pagingConfig, createSource()).refresh()
+
+        // 5 movies from the fake response must be inserted into Room.
+        assertEquals(1, capturedEntities.size)
+        assertEquals(5, capturedEntities.first().size)
+    }
+
+    @Test
+    fun `online - successful fetch does not leave Room untouched (verifies insertAll was called)`() = runTest {
+        every { networkMonitor.isCurrentlyOnline() } returns true
+        coEvery { apiService.getFavoriteMovies(any(), any(), 1) } returns
+            fakeMovieListResponse(page = 1, totalPages = 1, count = 3)
+
+        TestPager(pagingConfig, createSource()).refresh()
+
+        // Without the fix there would be no insertAll invocation at all.
+        coVerify(exactly = 1) { favoriteDao.insertAll(any()) }
+    }
+
+    @Test
+    fun `online - API error does NOT touch Room`() = runTest {
+        every { networkMonitor.isCurrentlyOnline() } returns true
+        coEvery { apiService.getFavoriteMovies(any(), any(), any()) } throws
+            RuntimeException("Network failure")
+
+        val source = createSource()
+        source.load(
+            PagingSource.LoadParams.Refresh(key = null, loadSize = 20, placeholdersEnabled = false)
+        )
+
+        // Coordinator behaviour: failed fetches must not partially write to cache.
+        coVerify(exactly = 0) { favoriteDao.insertAll(any()) }
     }
 
     // ── Offline path ──────────────────────────────────────────────────────────

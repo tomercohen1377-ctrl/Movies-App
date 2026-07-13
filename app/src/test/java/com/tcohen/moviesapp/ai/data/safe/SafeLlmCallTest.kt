@@ -17,7 +17,7 @@ import java.net.UnknownHostException
 /**
  * Unit tests for [safeLlmCall].
  *
- * Mirrors the philosophy of the existing `safeApiCall`-shaped utilities:
+ * Mirrors the philosophy of [com.tcohen.moviesapp.data.remote.api.SafeApiCaller]:
  * every distinct throwable must map to a specific [ApiError] entry so the UI
  * can show the right copy.
  */

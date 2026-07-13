@@ -8,12 +8,14 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 /**
- * LLM-aware analogue of `safeApiCall`. Wraps [block] in a try/catch and
+ * LLM-aware analogue of `SafeApiCaller`. Wraps [block] in a try/catch and
  * maps every failure mode to a [NetworkResult.Error] with the appropriate
  * [ApiError] entry owning the user-facing message.
  *
- * Differences from `safeApiCall`:
+ * Differences from [com.tcohen.moviesapp.data.remote.api.SafeApiCaller]:
  *
+ * - **No offline short-circuit.** LLM calls are currently made from screen-level
+ *   ViewModels that already gate on user action; we don't need the wrapper to.
  * - **No body-parsing fallback.** Providers like Gemini return errors in
  *   OpenAI-shape JSON too, but the error message is permitted to be opaque.
  *   We add a single dedicated [ApiError.RATE_LIMITED]/[ApiError.UNAUTHORIZED]/

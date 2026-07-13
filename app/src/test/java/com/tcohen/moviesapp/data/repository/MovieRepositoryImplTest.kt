@@ -2,6 +2,7 @@ package com.tcohen.moviesapp.data.repository
 
 import com.tcohen.moviesapp.data.local.dao.FavoriteDao
 import com.tcohen.moviesapp.data.local.dao.MovieDao
+import com.tcohen.moviesapp.data.remote.api.SafeApiCaller
 import com.tcohen.moviesapp.data.remote.api.TmdbApiService
 import com.tcohen.moviesapp.data.remote.dto.VideoResponse
 import com.tcohen.moviesapp.domain.model.Movie
@@ -41,9 +42,11 @@ class MovieRepositoryImplTest {
     private val networkMonitor: NetworkMonitor = mockk {
         every { isCurrentlyOnline() } returns false   // server sync path disabled in unit tests
     }
+    private val safeApiCaller = SafeApiCaller(networkMonitor)
     private val repository: MovieRepositoryImpl by lazy {
         MovieRepositoryImpl(
             apiService, movieDao, favoriteDao, networkMonitor,
+            safeApiCaller,
             accountId = "", sessionId = ""
         )
     }
@@ -52,6 +55,7 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getMovieDetail returns Success with mapped domain object`() = runTest {
+        every { networkMonitor.isCurrentlyOnline() } returns true
         val dto = fakeMovieDetailDto(id = 5)
         coEvery { apiService.getMovieDetails(5) } returns dto
 
@@ -64,6 +68,7 @@ class MovieRepositoryImplTest {
 
     @Test
     fun `getMovieDetail returns NetworkError when API throws`() = runTest {
+        every { networkMonitor.isCurrentlyOnline() } returns true
         coEvery { apiService.getMovieDetails(any()) } throws java.io.IOException("connection refused")
 
         val result = repository.getMovieDetail(999)
@@ -85,12 +90,22 @@ class MovieRepositoryImplTest {
     }
 
     @Test
-    fun `getTrailer returns Success with null when offline`() = runTest {
+    fun `getTrailer returns Error(NO_CONNECTION) when offline`() = runTest {
+        // The repository no longer carries an offline fast-path of its own; that
+        // responsibility has moved into SafeApiCaller. When offline, callers see the
+        // same error envelope the rest of the API surface uses, and the view-model
+        // collapses it to a "no trailer shown" UI state (`MovieDetailViewModel`).
         every { networkMonitor.isCurrentlyOnline() } returns false
+        // No API stub — the pre-check inside SafeApiCaller must short-circuit before
+        // the call hits the wire.
 
-        val result = repository.getTrailer(1) as NetworkResult.Success
+        val result = repository.getTrailer(1)
 
-        assertNull(result.data)
+        assertTrue(result is NetworkResult.Error)
+        assertEquals(
+            com.tcohen.moviesapp.util.ApiError.NO_CONNECTION.message,
+            (result as NetworkResult.Error).message
+        )
     }
 
     @Test
