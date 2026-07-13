@@ -16,23 +16,28 @@ import com.tcohen.moviesapp.ai.presentation.ploexplainer.PlotExplainerSection
 import com.tcohen.moviesapp.domain.model.Genre
 import com.tcohen.moviesapp.domain.model.MovieDetail
 import com.tcohen.moviesapp.presentation.common.TrailerPlayerSection
+import com.tcohen.moviesapp.presentation.moviedetail.morelikethis.MoreLikeThisSection
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 import com.tcohen.moviesapp.util.TmdbImageUrl
 
 /**
  * Scrollable body of the movie detail screen — trailer/backdrop at the top followed by
- * [MovieMetadata] and the AI plot-explainer [PlotExplainerSection]. Extracted so it can
- * be rendered behind the loading overlay while the YouTube player warms up, without
- * cluttering [MovieDetailScreen].
+ * [MovieMetadata], the AI plot-explainer [PlotExplainerSection], and the
+ * "More like this" carousel [MoreLikeThisSection]. Extracted so it can be rendered
+ * behind the loading overlay while the YouTube player warms up, without cluttering
+ * [MovieDetailScreen].
  *
  * @param uiState The [MovieDetailUiState.Success] to render.
  * @param onPlayerReady Callback fired once the YouTube player has initialised.
+ * @param onNavigateToSimilar Callback fired when the user taps a poster in the
+ *   "More like this" carousel; parent screen forwards to its `NavController`.
  */
 @Composable
 fun MovieDetailContent(
     uiState: MovieDetailUiState.Success,
     onPlayerReady: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToSimilar: (Int) -> Unit = {}
 ) {
     Column(modifier = modifier.verticalScroll(rememberScrollState())) {
 
@@ -67,6 +72,12 @@ fun MovieDetailContent(
             title = uiState.movie.title,
             year = releaseYear,
             runtimeMinutes = uiState.movie.runtime,
+        )
+
+        // "More like this" — same pattern: owns its own ViewModel, parent is unaware.
+        MoreLikeThisSection(
+            movieId = uiState.movie.id,
+            onMovieClicked = onNavigateToSimilar
         )
 
         // Bottom spacer so the FAB doesn't overlap the last line of text

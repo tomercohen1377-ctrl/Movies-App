@@ -44,6 +44,29 @@ interface TmdbApiService {
         @Query("language") language: String = DEFAULT_LANGUAGE
     ): VideoListResponse
 
+    /**
+     * Searches for movies by free-text [query]. Returned in TMDB's standard paginated
+     * shape, so reusing [MovieListResponse] (and its DTO mappers) avoids any new types.
+     */
+    @GET("search/movie")
+    suspend fun searchMovies(
+        @Query("query") query: String,
+        @Query("page") page: Int = DEFAULT_PAGE,
+        @Query("include_adult") includeAdult: Boolean = false,
+        @Query("language") language: String = DEFAULT_LANGUAGE
+    ): MovieListResponse
+
+    /**
+     * Returns movies "similar" to the given movie. Powered by TMDB's collaborative
+     * filtering — distinct from the personalised `recommendations` endpoint.
+     */
+    @GET("movie/{movie_id}/similar")
+    suspend fun getSimilarMovies(
+        @Path("movie_id") movieId: Int,
+        @Query("page") page: Int = DEFAULT_PAGE,
+        @Query("language") language: String = DEFAULT_LANGUAGE
+    ): MovieListResponse
+
     @POST("account/{account_id}/favorite")
     suspend fun markFavorite(
         @Path("account_id") accountId: String,

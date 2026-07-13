@@ -17,6 +17,25 @@ interface MovieRepository {
     suspend fun getMovieDetail(movieId: Int): NetworkResult<MovieDetail>
 
     /**
+     * Returns a paginated flow of movies matching the free-text [query].
+     *
+     * Online-only — searches are user-driven and ephemeral, so they don't write
+     * to the Room category cache. If the device is offline, the inner Paging source
+     * emits a [com.tcohen.moviesapp.util.NetworkUnavailableException] so the UI
+     * can render a "search requires internet" footer.
+     *
+     * The [Repository][com.tcohen.moviesapp.data.repository.MovieRepositoryImpl]
+     * short-circuits empty or below-threshold queries by emitting [PagingData.empty].
+     */
+    fun searchMovies(query: String): Flow<PagingData<Movie>>
+
+    /**
+     * Returns up to ~20 movies "similar" to [movieId], per TMDB's `/{id}/similar`
+     * endpoint. Capped at MOST_SIMILAR_MOVIES.
+     */
+    suspend fun getSimilarMovies(movieId: Int): NetworkResult<List<Movie>>
+
+    /**
      * Returns the best YouTube trailer for a movie, or [NetworkResult.Success] with
      * null if none is available / device is offline.
      */

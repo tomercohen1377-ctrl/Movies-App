@@ -34,6 +34,7 @@ import com.tcohen.moviesapp.presentation.common.ErrorView
 @Composable
 fun MovieDetailScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSimilar: (Int) -> Unit = {},
     viewModel: MovieDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -70,7 +71,8 @@ fun MovieDetailScreen(
                 MovieDetailContent(
                     uiState = state,
                     onPlayerReady = { playerReady = true },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    onNavigateToSimilar = onNavigateToSimilar
                 )
 
                 if (isPlayerPending) {

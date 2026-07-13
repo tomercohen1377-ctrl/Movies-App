@@ -3,6 +3,7 @@ package com.tcohen.moviesapp.presentation.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -16,7 +17,11 @@ import androidx.navigation.compose.rememberNavController
 import com.tcohen.moviesapp.presentation.theme.MoviesAppTheme
 
 /**
- * Bottom navigation bar with exactly 2 tabs: Home and Favorites.
+ * Bottom navigation bar with 3 tabs: **Home**, **Search**, **Favorites**.
+ *
+ * Search is a top-level verb (not an action on a screen), so it deserves its own
+ * tab — discoverability wins over having a top-app-bar search icon that pushes
+ * another full-screen route.
  */
 @Composable
 fun BottomNavBar(navController: NavController) {
@@ -25,6 +30,11 @@ fun BottomNavBar(navController: NavController) {
             screen = Screen.Home,
             label = "Home",
             icon = Icons.Filled.Home
+        ),
+        BottomNavItem(
+            screen = Screen.Search,
+            label = "Search",
+            icon = Icons.Filled.Search
         ),
         BottomNavItem(
             screen = Screen.Favorites,

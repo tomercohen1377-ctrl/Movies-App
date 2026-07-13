@@ -2,6 +2,8 @@
 
 A production-quality Android application that browses movies using [The Movie Database (TMDB) API](https://www.themoviedb.org/documentation/api). Built showcasing Clean Architecture, MVI, Jetpack Compose, Paging 3, typed network error handling, and comprehensive test coverage — including real end-to-end journey tests against the live TMDB API.
 
+Free-text search, "More like this" recs, server-mirror Room cache, debounced query streaming, and AI plot summaries are the headline features.
+
 ---
 
 ## Screenshots
@@ -19,6 +21,8 @@ A production-quality Android application that browses movies using [The Movie Da
 ## Table of Contents
 
 - [Features](#features)
+- [Search](#search)
+- [More Like This](#more-like-this)
 - [AI Plot Summary](#ai-plot-summary)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
@@ -38,21 +42,136 @@ A production-quality Android application that browses movies using [The Movie Da
 
 | Feature | Detail |
 |---|---|
-| **2-tab bottom navigation** | Home (movie grid) + Favorites |
+| **3-tab bottom navigation** | Home (movie grid) · Search · Favorites |
+| **Free-text search** | Debounced query stream (300 ms), `MIN_QUERY_LENGTH = 2` gate, MRU history chips, no Room cache for queries — see [Search](#search) |
 | **Category filter chips** | Now Playing · Top Rated · Upcoming — defaults to Now Playing |
 | **Infinite scroll / Paging 3** | 20 items per page, prefetches the next page automatically |
-| **Full-bleed poster cards** | 2:3 aspect-ratio cards with gradient scrim, rating badge, and swipe-to-remove on Favorites |
-| **Movie detail screen** | YouTube trailer at the top, then metadata: title, year, runtime, rating, genre chips, tagline, overview |
+| **Full-bleed poster cards** | 2:3 aspect-ratio cards with gradient scrim, rating badge; swipe-to-remove on Favorites |
+| **Movie detail screen** | YouTube trailer at the top, then metadata, AI summary, and a horizontal "More like this" carousel — see [More Like This](#more-like-this) |
 | **Slide navigation animation** | Detail screen slides in from the right; slides back out on back press |
 | **Favorites — server sync** | Add/remove favorites syncs to your TMDB account via `POST /account/{id}/favorite` |
 | **Favorites — paginated** | Favorites grid is driven by Paging 3; online pages come from TMDB, offline from Room |
-| **Favorites — live updates** | Grid refreshes automatically whenever a movie is toggled on **any screen** (detail FAB or favorites swipe) |
+| **Favorites — live updates** | Grid refreshes automatically whenever a movie is toggled on **any screen** (detail FAB, favorites swipe, or detailed-from-search) |
+| **Favorites — Room server-mirror** | `FavoritesPagingSource.loadFromNetwork` writes through to Room so `observeIsFavorite(id)` reflects server truth on a fresh install; closes the detail-screen-fav-state bug |
 | **Swipe to remove favorites** | Swipe a favorites card left to remove; disabled while offline |
-| **Offline banner** | Animated banner on both Home and Favorites when connectivity is lost |
+| **Offline banner** | Animated banner on Home, Search, and Favorites when connectivity is lost |
 | **Image caching — 1-day TTL** | Coil DiskCache (100 MB) + `Cache-Control: max-age=86400`; images served from disk up to 24 hours |
 | **Offline image serving** | Images cached on disk are served immediately without any network request |
-| **Typed error handling** | `NetworkResult<T>` sealed class; HTTP error messages come from TMDB's `status_message` body; connectivity errors mapped to `ApiError` enum entries |
+| **Typed error handling** | `NetworkResult<T>` sealed class; HTTP error messages from TMDB's `status_message` body; connectivity errors mapped to `ApiError` enum entries. All API calls go through `SafeApiCaller` — no `isCurrentlyOnline()` pre-checks scattered around repository / paging-source code |
 | **AI plot summary** | On the detail screen, generate a short LLM-written plot summary from the movie's overview; cached & rerunnable via Reset — see [AI Plot Summary](#ai-plot-summary) |
+
+---
+
+## Search
+
+The third bottom-nav tab is a free-text movie search. Tapping the Search tab
+opens an input-first screen with type-ahead behaviour: every keystroke fires
+the underlying Pager through a `debounce(300 ms) → distinctUntilChanged →
+flatMapLatest` chain, so a 20-character query only causes one network round-trip
+after the user stops typing.
+
+### How it works
+
+- **Threshold gate** — queries below `MIN_QUERY_LENGTH = 2` short-circuit to
+  `PagingData.empty()` without hitting TMDB, so single-character queries don't
+  pull the index of "any title starting with `a`".
+- **Search is online-only** — by design. User-driven, ephemeral, no need to
+  churn the category-keyed Room cache. The whole path goes through
+  `SafeApiCaller`, so offline surfaces as the friendly "Search requires an
+  internet connection. Showing nothing." copy, exactly like every other
+  network error in the app.
+- **MRU history chips** — when the user taps a result, the typed query is
+  added to `SearchHistoryRepository` (in-memory, MRU-ordered, FIFO-capped at
+  5). Tapping a chip refills the input; the chip row hides as soon as the
+  input has content.
+- **`cachedIn(viewModelScope)`** — paging state survives a round-trip into
+  the Detail screen, so back-button preserves scroll position.
+- **Empty states** — three distinct renders: `SearchPrompt` ("type to
+  search …") for fresh entry, `NoMatchesState` ("No matches for "Dune"")
+  when the typed query returned 0 rows, and the standard `ErrorView`
+  otherwise.
+
+### Architecture in one breath
+
+```
+SearchScreen ─ debounced query flow ─► SearchViewModel ─► MovieRepository.searchMovies
+                                                              │
+                                                              ▼
+                                                    Pager (Paging 3)
+                                                              │
+                                                              ▼
+                                                    SearchPagingSource
+                                                              │
+                                                              ▼
+                                                    safeApiCaller  ◄── offline + exception mapping
+                                                              │
+                                                              ▼
+                                                    TmdbApiService.searchMovies
+```
+
+### Files
+
+- `data/remote/paging/SearchDefaults.kt` — `MIN_QUERY_LENGTH`, `DEBOUNCE_MS`,
+  `HISTORY_LIMIT`.
+- `data/remote/paging/SearchPagingSource.kt` — uses `SafeApiCaller` inside
+  `load()`; maps `ApiError.NO_CONNECTION` back to `NetworkUnavailableException`
+  so `LoadState.Error` renders the right footer copy.
+- `data/local/SearchHistoryRepository.kt` — `@Singleton` in-memory MRU with
+  `take(HISTORY_LIMIT)` eviction.
+- `presentation/search/SearchContract.kt` — `SearchState`,
+  `SearchIntent`, `SearchEffect` (the same MVI tri-shape used everywhere else
+  in the app).
+- `presentation/search/SearchViewModel.kt` — owns `MutableStateFlow<String>`
+  query + the `_query.debounce().distinctUntilChanged().flatMapLatest()`
+  chain.
+- `presentation/search/SearchScreen.kt` — input bar with leading/trailing
+  icons, history `LazyRow`, body multiplexing Loading / Error / Empty /
+  Has-Results.
+
+---
+
+## More Like This
+
+Below the AI plot-explainer, the Detail screen renders a horizontal
+**"More like this"** carousel powered by TMDB's `GET /movie/{id}/similar`
+endpoint. Each poster is tappable; the navigation pushes a fresh detail
+screen for the tapped movie.
+
+### How it works
+
+- **Lazy, in-place load** — the section inflates inside the Detail screen
+  and fires its own load via a `LaunchedEffect(movieId)`. The parent
+  `MovieDetailViewModel` is unaware of it (same decoupled pattern as the
+  `PlotExplainerSection`).
+- **Sealed UI state** — `Idle`, `Loading`, `Success(movies)`, `Empty`,
+  `Error(message)`. The Composable does an exhaustive `when (state)` so
+  every branch is compiler-checked; nothing is rendered for `Idle` /
+  `Empty` (cleanly hides the entire row).
+- **Self-contained ViewModel** — `MoreLikeThisViewModel` is `hiltViewModel`'d
+  per composition, keyed on `movieId`, so navigating between detail screens
+  produces instance-fresh VMs with no stale state.
+- **Graceful degradation** — failed fetches render the section header +
+  the error message + a `Retry` button inline. Never hijacks the detail
+  screen with a full-screen error.
+- **Repository returns `NetworkResult<List<Movie>>`** — rounded by
+  `SafeApiCaller`, so all four `ApiError` shapes (`NO_CONNECTION`, `TIMEOUT`,
+  `SERVER_ERROR`, `UNEXPECTED`) route through the same wrapper used by every
+  other endpoint.
+
+### Files
+
+- `presentation/common/SimilarMoviePosterCard.kt` — compact 110 dp wide
+  variant of `MovieCard`, title + year under the poster,
+  `testTag("similar_movie_card")`.
+- `presentation/moviedetail/morelikethis/MoreLikeThisContract.kt` —
+  `MoreLikeThisState` (5 sealed cases) + `MoreLikeThisIntent` +
+  `MoreLikeThisEffect`.
+- `presentation/moviedetail/morelikethis/MoreLikeThisViewModel.kt` —
+  `@HiltViewModel` with an `@Inject MovieRepository`; reads the
+  `NetworkResult` envelope returned by `repository.getSimilarMovies(id)`.
+- `presentation/moviedetail/morelikethis/MoreLikeThisSection.kt` — the
+  composable section; renders `Loading`/`Success`/`Error` and hides
+  `Idle`/`Empty`.
 
 ---
 
@@ -156,30 +275,35 @@ The FAB is only rendered inside the `Success` branch — impossible to show duri
 ```
 app/src/main/java/com/tcohen/moviesapp/
 ├── data/
-│   ├── local/              # Room DB (v1), AppDatabase, DAOs (MovieDao, FavoriteDao), entities
+│   ├── local/              # Room DB (v1), AppDatabase, DAOs (MovieDao, FavoriteDao),
+│   │                       # entities, SearchHistoryRepository (in-memory MRU)
 │   ├── remote/
-│   │   ├── api/            # TmdbApiService, SafeApiCall wrapper
+│   │   ├── api/            # TmdbApiService, SafeApiCaller wrapper
 │   │   ├── dto/            # Request/Response DTOs (suffixed *Request / *Response)
 │   │   ├── interceptor/    # AuthInterceptor (Bearer token)
-│   │   └── paging/         # MoviePagingSource, FavoritesPagingSource, PagingDefaults
+│   │   └── paging/         # MoviePagingSource, FavoritesPagingSource,
+│   │                       # SearchPagingSource, PagingDefaults, SearchDefaults
 │   ├── repository/         # MovieRepositoryImpl
-│   └── mapper/             # DTO ↔ Domain ↔ Entity mappers
+│   └── mapper/             # DTO ↔ Domain ↔ Entity mappers (incl. toFavoriteEntity)
 ├── domain/
 │   ├── model/              # Movie, MovieDetail, Genre, VideoResult, Category, CategoryExt
-│   └── repository/         # MovieRepository interface
+│   └── repository/         # MovieRepository interface (incl. searchMovies, getSimilarMovies)
 ├── presentation/
 │   ├── home/               # HomeScreen, HomeViewModel, HomeContract
+│   ├── search/             # SearchScreen, SearchViewModel, SearchContract
 │   ├── moviedetail/        # MovieDetailScreen, MovieDetailContent, MovieMetadata,
-│   │                       # MovieDetailViewModel, MovieDetailContract
+│   │                       # MovieDetailViewModel, MovieDetailContract,
+│   │                       # morelikethis/ (MoreLikeThisContract, MoreLikeThisViewModel,
+│   │                       # MoreLikeThisSection)
 │   ├── favorites/          # FavoritesScreen, FavoritesComponents, FavoritesViewModel,
 │   │                       # FavoritesContract
 │   ├── common/             # MovieCard, MovieGrid, MoviePosterImage, CategoryFilterRow,
 │   │                       # RatingBadge, TrailerPlayerSection, NetworkErrorFooter,
-│   │                       # ErrorView, OfflineBanner
+│   │                       # ErrorView, OfflineBanner, SimilarMoviePosterCard
 │   ├── navigation/         # AppNavGraph (slide transitions), BottomNavBar, Screen
 │   └── theme/              # MoviesAppTheme, Typography
 ���── di/                     # Hilt modules (NetworkModule, DatabaseModule,
-│                           #   RepositoryModule, UtilModule)
+│                           #   RepositoryModule, UtilModule, LlmModule)
 └── util/                   # NetworkMonitor, TmdbImageUrl, NetworkResult,
                             # ApiError, NetworkUnavailableException
 ```
@@ -280,16 +404,35 @@ Favorite movies are stored in the `favorites` Room table and synced to the TMDB 
 | Scrolling within cached movie pages | Served from Room — no network needed, no error shown |
 | Scrolling past cached pages | `NetworkErrorFooter` at the bottom; list above remains scrollable |
 | Opening movie detail while offline | Full-screen `ErrorView` with Retry button |
-| Trailer when offline | Backdrop image shown — no crash, no error banner |
+| Trailer when offline | Backdrop image shown — no crash, no error banner; courtesy of the `SafeApiCaller`-driven `Success(null)` fast-path in `MovieRepositoryImpl.getTrailer` |
+| "More like this" while offline | Section hides itself (header + carousel gone); no error UI — non-blocking by design |
+| Search while offline | Friendly "Search requires an internet connection. Showing nothing." `ErrorView`; user can still type and the prompt/chips stay visible |
 | Images when offline | Served from Coil DiskCache (if fetched within the last 24 hours) |
 | Favorites while offline | Room cache served; swipe-to-remove disabled; offline banner shown |
 | Returning online | Paging retries automatically; detail screen shows Retry |
+| First-time offline arrival on Favorites | `FavoritesPagingSource.loadFromCache` returns `LoadResult.Error(NetworkUnavailableException)` so the footer copy stays consistent with the rest of the app |
 
 ---
 
 ## Error Handling
 
-All API calls go through `safeApiCall`, which maps every failure to `NetworkResult<T>`:
+All API calls go through the Hilt-injectable `SafeApiCaller` wrapper
+(`data/remote/api/SafeApiCaller.kt`), which owns two responsibilities in one
+place — the project no longer scatters duplicate `isCurrentlyOnline()`
+pre-checks around the repository or paging sources:
+
+1. **Offline short-circuit.** When the device has no connectivity, the
+   wrapper returns `NetworkResult.Error(ApiError.NO_CONNECTION.message)`
+   immediately rather than waiting for OkHttp to raise `UnknownHostException`
+   / `SocketTimeoutException`. Callers that need bespoke offline behaviour
+   (currently only `MovieRepositoryImpl.getTrailer`, which returns
+   `Success(null)` so the trailer section degrades to the backdrop image) opt
+   out via `bypassOfflineCheck = true`.
+
+2. **Exception → `NetworkResult` mapping.** HTTP errors parse the TMDB
+   `status_message` body; connectivity failures map to other `ApiError`
+   entries. The mapping table is the single source of truth for "what does
+   exception X mean to the user?".
 
 ```kotlin
 sealed class NetworkResult<out T> {
@@ -300,13 +443,13 @@ sealed class NetworkResult<out T> {
 
 - **HTTP errors:** the TMDB error body (`{"status_message": "..."}`) is parsed and its `statusMessage` is used as the user-facing string. If parsing fails, `ApiError.SERVER_ERROR.message` is the fallback.
 - **Connectivity errors:** mapped to `ApiError` enum entries (`NO_CONNECTION`, `TIMEOUT`, `UNEXPECTED`), which own their display strings in one place.
-- **Paging errors:** `LoadResult.Error(e)` propagates to `LoadState.Error`; the UI renders `NetworkErrorFooter` (inline) or `ErrorView` (full-screen) accordingly.
+- **Paging errors:** `LoadResult.Error(e)` propagates to `LoadState.Error`; the UI renders `NetworkErrorFooter` (inline) or `ErrorView` (full-screen) accordingly. `SearchPagingSource` translates `ApiError.NO_CONNECTION` back to `NetworkUnavailableException` so the offline footer copy stays consistent.
 
 ---
 
 ## Testing
 
-### Unit Tests — 101 tests (run on JVM, no device needed)
+### Unit Tests — 153 tests (run on JVM, no device needed)
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -318,8 +461,13 @@ sealed class NetworkResult<out T> {
 | `MovieDetailViewModelTest` | 12 | All UI states (Loading/Success/Error), trailer degradation, favorite toggle, HTTP error codes |
 | `FavoritesViewModelTest` | 4 | Offline state, remove favorite, paging flow |
 | `MoviePagingSourceTest` | 10 | Online/offline paths, page keys, error cases |
-| `FavoritesPagingSourceTest` | 11 | Online/offline paths, offset pagination, next-page detection |
-| `MovieRepositoryImplTest` | 13 | `getMovieDetail`, `getTrailer`, `toggleFavorite`, server sync |
+| `FavoritesPagingSourceTest` | 11 | Online/offline paths, offset pagination, next-page detection — incl. the new mid-flight Room write-through |
+| `SearchViewModelTest` | 13 | Debounced query flow, `MIN_QUERY_LENGTH` gate, `distinctUntilChanged`, history MRU integration, empty/non-empty threshold, `OpenDetail` effect |
+| `SearchPagingSourceTest` | 10 | Online success + page keys, offline → `NetworkUnavailableException` (no API call fired), generic error → `Exception(message)`, `getRefreshKey` cases |
+| `SearchHistoryRepositoryTest` | 9 | MRU ordering, case-insensitive dedup, trim, blank-ignored, FIFO cap at `HISTORY_LIMIT`, clear |
+| `MovieRepositoryImplTest` | 13 | `getMovieDetail`, `getTrailer`, `toggleFavorite`, server sync, `searchMovies`, `getSimilarMovies` |
+| `MoreLikeThisViewModelTest` | 7 | All 5 sealed states reachable (`Idle`/`Loading`/`Success`/`Empty`/`Error`); error-retry transition; `NavigateToDetail` effect |
+| `SafeApiCallTest` | 13 | Offline short-circuit (block must NOT run, verified via invocation counter), `bypassOfflineCheck=true` semantics, IOException / SocketTimeout / UnknownHost → typed `ApiError`, HttpException w/ TMDB status_message + 4 fallback variants, cancellation propagates, default `bypassOfflineCheck` is `false` |
 | `MovieMapperTest` | 12 | DTO → domain, domain → entity, round-trips |
 | `TmdbImageUrlTest` | 9 | `poster()`, `posterLarge()`, `backdrop()` — null and non-null inputs |
 | `CategoryExtTest` | 9 | `displayName` for all categories, ordering, uniqueness |

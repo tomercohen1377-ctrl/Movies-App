@@ -15,6 +15,7 @@ import androidx.navigation.compose.rememberNavController
 import com.tcohen.moviesapp.presentation.favorites.FavoritesScreen
 import com.tcohen.moviesapp.presentation.home.HomeScreen
 import com.tcohen.moviesapp.presentation.moviedetail.MovieDetailScreen
+import com.tcohen.moviesapp.presentation.search.SearchScreen
 
 @Composable
 fun AppNavGraph(
@@ -25,6 +26,7 @@ fun AppNavGraph(
 
     val showBottomBar = currentRoute in setOf(
         Screen.Home.route,
+        Screen.Search.route,
         Screen.Favorites.route
     )
 
@@ -60,6 +62,16 @@ fun AppNavGraph(
                 )
             }
 
+            composable(Screen.Search.route) {
+                SearchScreen(
+                    onNavigateToDetail = { movieId ->
+                        navController.navigate(Screen.MovieDetail.createRoute(movieId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
             composable(
                 route = Screen.MovieDetail.routeWithArgs,
                 arguments = Screen.MovieDetail.arguments,
@@ -76,7 +88,10 @@ fun AppNavGraph(
                 popEnterTransition = null
             ) {
                 MovieDetailScreen(
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToSimilar = { movieId ->
+                        navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                    }
                 )
             }
         }
